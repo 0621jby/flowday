@@ -48,7 +48,7 @@ fi
 
 # Restore to a separate clean database in the disposable CI container.
 createdb flowday_restored
-PGDATABASE=flowday_restored pg_restore --exit-on-error --no-owner --single-transaction "$work/backup.dump"
+pg_restore --dbname=flowday_restored --exit-on-error --no-owner --single-transaction "$work/backup.dump"
 export PGDATABASE=flowday_restored
 [[ $(psql -X -Atc 'SELECT count(*) FROM auth.users') == 2 ]]
 [[ $(psql -X -Atc 'SELECT count(*) FROM public.schedule_blocks') == 2 ]]
