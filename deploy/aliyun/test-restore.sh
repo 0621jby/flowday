@@ -48,7 +48,11 @@ fi
 
 # Restore to a separate clean database in the disposable CI container.
 createdb flowday_restored
-pg_restore --dbname=flowday_restored --exit-on-error --no-owner --single-transaction "$work/backup.dump"
+# PostgreSQL's template already contains public. Keep all its objects and grants
+# in the restore list and skip only the redundant CREATE SCHEMA.
+pg_restore --list "$work/backup.dump" | sed '/^[0-9].* SCHEMA - public /s/^/;/' >"$work/restore.list"
+pg_restore --dbname=flowday_restored --exit-on-error --no-owner --single-transaction \
+  --use-list="$work/restore.list" "$work/backup.dump"
 export PGDATABASE=flowday_restored
 [[ $(psql -X -Atc 'SELECT count(*) FROM auth.users') == 2 ]]
 [[ $(psql -X -Atc 'SELECT count(*) FROM public.schedule_blocks') == 2 ]]
