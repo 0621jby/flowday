@@ -55,7 +55,9 @@ if ! /opt/flowday/bin/psql -X -At -v ON_ERROR_STOP=1 -c 'SELECT current_setting(
   exit 1
 fi
 
-cat >runtime.env <<EOF
+config_tmp=$(mktemp /opt/flowday/.runtime.XXXXXX)
+trap 'rm -f -- "$config_tmp"' EXIT
+cat >"$config_tmp" <<EOF
 FLOWDAY_REQUIRE_CLOUD=1
 APP_ORIGIN=$origin
 NEXT_PUBLIC_SUPABASE_URL=https://$project.supabase.co
@@ -64,4 +66,5 @@ AI_PROPOSAL_SECRET=$(openssl rand -hex 32)
 AI_PROVIDER=mock
 AI_ENABLE_PAID_CALLS=false
 EOF
-echo 'FlowDay server credentials verified. Deployment and HTTPS still need to be enabled.'
+mv -- "$config_tmp" runtime.env
+echo 'FlowDay server credentials verified. Deployment will start automatically.'

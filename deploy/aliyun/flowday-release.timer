@@ -3,7 +3,7 @@ Description=Check for new FlowDay releases
 
 [Timer]
 OnBootSec=2min
-OnUnitInactiveSec=3min
+OnCalendar=*-*-* *:00/3:00
 
 [Install]
 WantedBy=timers.target

@@ -2,6 +2,7 @@
 Description=Deploy a tested FlowDay image
 Requires=docker.service
 After=docker.service network-online.target
+ConditionPathExists=/opt/flowday/runtime.env
 
 [Service]
 Type=oneshot

@@ -1,6 +1,7 @@
 [Unit]
 Description=Back up FlowDay and record database usage
 After=network-online.target
+ConditionPathExists=/opt/flowday/runtime.env
 
 [Service]
 Type=oneshot
