@@ -36,17 +36,21 @@ check_app() {
     if response=$(curl --fail --silent --max-time 3 "$health") &&
       [[ $response == *"\"release\":\"$sha\""* &&
          $response == *'"mode":"cloud-configured"'* ]]; then
-      FLOWDAY_IMAGE=$image docker compose exec -T app node -e '
-        const url = new URL("/auth/v1/settings", process.env.NEXT_PUBLIC_SUPABASE_URL);
-        fetch(url, {
-          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY },
-          signal: AbortSignal.timeout(8000),
-        }).then((r) => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1));
-      ' && return 0
+      return 0
     fi
     sleep 2
   done
   return 1
+}
+
+check_auth() {
+  FLOWDAY_IMAGE=$1 docker compose exec -T app node -e '
+    const url = new URL("/auth/v1/settings", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    fetch(url, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY },
+      signal: AbortSignal.timeout(8000),
+    }).then((r) => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1));
+  '
 }
 
 save_release() {
@@ -101,17 +105,21 @@ if ! bash postgres.sh migrate "$work/migrations" "$backup"; then
   log "Backup or migration failed, candidate was not started"
   exit 1
 fi
-if switch_app "$candidate" && check_app "$candidate"; then
+if switch_app "$candidate" && check_app "$candidate" && check_auth "$candidate"; then
   [[ -z $current ]] || save_release "$current" ops/previous
   save_release "$candidate" ops/current
   log "Deployed $candidate"
 else
   save_release "$candidate" ops/rejected
-  if [[ -n $current ]] && switch_app "$current" && check_app "$current"; then
-    log "Candidate failed, restored $current"
+  if [[ -n $current ]]; then
+    if switch_app "$current" && check_app "$current"; then
+      log "Candidate failed, restored $current"
+    else
+      log "Candidate failed and previous app did not pass the local health check"
+    fi
   else
     FLOWDAY_IMAGE=$candidate docker compose stop app
-    log "Candidate failed and no healthy prior app could be started"
+    log "Initial candidate failed and was stopped"
   fi
   exit 1
 fi

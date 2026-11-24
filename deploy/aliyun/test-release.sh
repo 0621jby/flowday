@@ -20,7 +20,7 @@ case "$*" in
   'create '*) echo temp-container ;;
   'cp '*) mkdir "$3" ;;
   'compose up '*) printf '%s\n' "$FLOWDAY_IMAGE" >>ops/switches ;;
-  'compose exec '*) [[ $FLOWDAY_IMAGE == "$FLOWDAY_TEST_OLD" ]] ;;
+  'compose exec '*) exit 1 ;; # Simulate an Auth outage affecting both images.
   'pull '*|'rm temp-container') ;;
   *) exit 99 ;;
 esac
