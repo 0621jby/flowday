@@ -1,0 +1,14 @@
+[Unit]
+Description=FlowDay dedicated HTTPS proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/sbin/nginx -t -q -c /opt/flowday/nginx-ip.conf
+ExecStart=/usr/sbin/nginx -c /opt/flowday/nginx-ip.conf -g "daemon off;"
+ExecReload=/usr/sbin/nginx -t -q -c /opt/flowday/nginx-ip.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

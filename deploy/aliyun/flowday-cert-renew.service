@@ -1,0 +1,7 @@
+[Unit]
+Description=Renew the FlowDay HTTPS certificate
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/flowday/certbot/bin/certbot renew --quiet --cert-name flowday-ip --deploy-hook "/usr/bin/systemctl reload flowday-proxy.service"

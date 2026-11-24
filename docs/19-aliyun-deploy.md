@@ -15,6 +15,10 @@
 - 确认服务器上现有反向代理的端口和虚拟主机后，使用 [Nginx 示例](../deploy/aliyun/nginx-flowday.conf.example) 增加单独虚拟主机。后端仅绑定 `127.0.0.1:13100`。对已有配置做语法检查后再重载。页面和用户 API 不经代理缓存，静态资源使用 Next.js 原有的版本化路径。北京主机正式域名按阿里云要求完成备案后上线，早期可用 SSH 隧道访问回环地址做本地模式验收。HTTPS 是录入真实用户数据的上线条件。[阿里云域名与备案说明](https://help.aliyun.com/zh/simple-application-server/user-guide/manage-domain-names/)
 - 默认 Supabase 邮件只送达项目团队的预授权地址。个人验收可用控制台预先创建并确认的测试用户，面向普通用户自助注册时配置获准使用的 SMTP。生产验收分别记录控制台建号、应用自助注册、邮箱确认及登录的结果。[Supabase 邮件限制](https://supabase.com/docs/guides/auth/auth-smtp)
 
+本实例可使用 `sudo bash /opt/flowday/configure-runtime.sh` 一次录入运行设置。脚本验证带证书校验的数据库连接，并把镜像拉取凭证单独放在 `/etc/flowday/docker`。如果系统信任库无法验证 Supabase 的证书，将控制台下载的 CA 放入 `/etc/flowday/postgres-ca/prod-supabase.cer`，然后重试。PostgreSQL 客户端以固定镜像摘要运行，启动时只挂载数据库连接配置与 FlowDay 的运维目录。
+
+个人 IP 验收可使用 [独立 HTTPS 代理](../deploy/aliyun/flowday-proxy.service) 和 [续签定时器](../deploy/aliyun/flowday-cert-renew.timer)。本实例的 80 端口由现有 Solar 服务提供，Certbot 只在它的静态目录写入 ACME 验证文件，FlowDay 代理独立监听 443。签发及续签演练通过后才启用代理，并从服务器外验证证书。IP 证书约六天到期，续签失败须及时处理。[Let’s Encrypt IP 证书](https://letsencrypt.org/2026/03/11/shorter-certs-certbot)
+
 ## 3. 版本发布和应用回滚
 
 首次初始化由管理员完成。运行目录 `/opt/flowday`、环境变量文件、日志目录和 systemd 单元均归 root 所有。安装 `flowday-release.service`、`flowday-rollback.service`、`flowday-backup.service` 及对应定时器后，专用 SSH 账号只接收 `status`、`logs`、`update` 和 `rollback`。首次初始化和常规发布使用不同的 SSH 公钥。
