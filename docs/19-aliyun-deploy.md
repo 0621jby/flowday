@@ -17,6 +17,8 @@
 
 ## 3. 版本发布和应用回滚
 
+首次初始化由管理员完成。运行目录 `/opt/flowday`、环境变量文件、日志目录和 systemd 单元均归 root 所有。安装 `flowday-release.service`、`flowday-rollback.service`、`flowday-backup.service` 及对应定时器后，专用 SSH 账号只接收 `status`、`logs`、`update` 和 `rollback`。首次初始化和常规发布使用不同的 SSH 公钥。
+
 1. 本地完成修改和测试，提交并推送 GitHub。工作流在 Linux 运行项目测试、PostgreSQL 备份恢复演练和容器验证。仓库变量 `FLOWDAY_PUBLISH_IMAGE=1` 启用通过检查的 `main` 镜像发布。部署侧用该私有镜像的只读凭证登录 GHCR。
 2. 复制部署文件至 `/opt/flowday`，将 [operations.env.example](../deploy/aliyun/operations.env.example) 配置在 `/etc/flowday/operations.env`。在日常运行这些脚本的同一账户下确认 Docker 登录和 PostgreSQL 连接。先人工运行一次 `flowday-release.service`，确认容器健康、真实 Supabase 连通和 HTTPS 返回正确；再启用 `flowday-release.timer` 和 `flowday-backup.timer`。
 3. [release.sh](../deploy/aliyun/release.sh) 发现新镜像后先生成数据库备份，再运行 [postgres.sh](../deploy/aliyun/postgres.sh)。迁移与校验和登记一起提交，失败会中止发布。新版本启动后，脚本校验 `/api/health` 返回的 Git 提交、云端模式及 Auth 接口可用性。应用检查失败会切回上一个镜像。更新有短暂的容器切换窗口。

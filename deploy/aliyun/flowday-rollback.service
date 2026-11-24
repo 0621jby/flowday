@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore the previously deployed FlowDay image
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/flowday
+EnvironmentFile=/etc/flowday/operations.env
+ExecStart=/usr/bin/bash /opt/flowday/release.sh rollback
+TimeoutStartSec=10min
