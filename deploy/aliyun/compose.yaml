@@ -1,0 +1,17 @@
+name: flowday
+services:
+  app:
+    image: ${FLOWDAY_IMAGE:?FLOWDAY_IMAGE must be set to the tested image digest}
+    env_file: runtime.env
+    environment:
+      NODE_OPTIONS: --max-old-space-size=256
+    restart: unless-stopped
+    mem_limit: 384m
+    init: true
+    ports:
+      - "127.0.0.1:${FLOWDAY_HTTP_PORT:-13100}:3100"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

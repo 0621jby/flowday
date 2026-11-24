@@ -1,0 +1,64 @@
+name: FlowDay release checks
+on:
+  push:
+    branches: [main, aliyun/preflight]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: flowday-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Unit and integration tests
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work node:24-bookworm-slim \
+            sh -ec 'npm ci && npm test'
+      - name: PostgreSQL backup and restore drill
+        run: |
+          docker run -d --name flowday-pg-test --network none \
+            --mount "type=bind,source=$PWD,target=/work,readonly" \
+            -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17-bookworm
+          trap 'docker rm -f flowday-pg-test >/dev/null' EXIT
+          for attempt in {1..45}; do
+            if docker exec flowday-pg-test sh -c 'test "$(cat /proc/1/comm)" = postgres && pg_isready -U postgres' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec flowday-pg-test bash /work/deploy/aliyun/test-restore.sh
+      - name: Simulate a failed rollout
+        run: bash deploy/aliyun/test-release.sh
+      - name: Build and smoke-test Linux image
+        run: |
+          docker build --build-arg "FLOWDAY_RELEASE=$GITHUB_SHA" -t "flowday:$GITHUB_SHA" .
+          docker run -d --name flowday-smoke "flowday:$GITHUB_SHA"
+          trap 'docker rm -f flowday-smoke >/dev/null' EXIT
+          for attempt in {1..20}; do
+            status=$(docker inspect --format '{{.State.Health.Status}}' flowday-smoke)
+            if [[ $status == healthy ]]; then break; fi
+            sleep 3
+          done
+          docker exec flowday-smoke node -e 'Promise.all([fetch("http://127.0.0.1:3100/api/health").then(r=>r.json()),fetch("http://127.0.0.1:3100/")]).then(([h,r])=>{if(h.release!==process.env.FLOWDAY_RELEASE||h.mode!=="local"||!r.ok) process.exit(1)}).catch(()=>process.exit(1))'
+      - name: Publish tested image
+        if: github.ref == 'refs/heads/main' && vars.FLOWDAY_PUBLISH_IMAGE == '1'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag "flowday:$GITHUB_SHA" "$repository:$GITHUB_SHA"
+          docker tag "flowday:$GITHUB_SHA" "$repository:main"
+          docker push "$repository:$GITHUB_SHA"
+          docker push "$repository:main"

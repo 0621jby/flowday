@@ -1,6 +1,12 @@
 export function cloudConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (process.env.FLOWDAY_REQUIRE_CLOUD === "1") {
+    const origin = new URL(process.env.APP_ORIGIN ?? "");
+    if (origin.protocol !== "https:" || origin.origin !== process.env.APP_ORIGIN)
+      throw new Error("APP_ORIGIN 必须是完整的 HTTPS 站点来源，不带路径或末尾斜杠。");
+    if (!url || !key) throw new Error("生产工作区必须配置 Supabase。");
+  }
   if (!url && !key) return null;
   if (!url || !key) throw new Error("Supabase 配置不完整，请检查环境变量。");
   const parsed = new URL(url);

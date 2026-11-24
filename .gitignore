@@ -9,3 +9,5 @@ coverage/
 *.log
 test-results/
 playwright-report/
+/deploy/aliyun/runtime.env
+/deploy/aliyun/ops/

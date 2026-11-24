@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up FlowDay and record database usage
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/flowday
+EnvironmentFile=/etc/flowday/operations.env
+ExecStart=/usr/bin/bash /opt/flowday/maintenance.sh
+TimeoutStartSec=30min

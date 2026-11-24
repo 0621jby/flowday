@@ -4,6 +4,7 @@ export function GET() {
     {
       status: "ok",
       service: "flowday",
+      release: process.env.FLOWDAY_RELEASE || "dev",
       mode: cloudConfig() ? "cloud-configured" : "local",
       databaseConnectivity: "not-probed",
       schemaVersion: 1,

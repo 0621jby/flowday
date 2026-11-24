@@ -3,6 +3,18 @@ import { cloudConfig, cookieOptions } from "../src/lib/supabase/config";
 
 afterEach(() => vi.unstubAllEnvs());
 describe("cloud configuration and session cookies", () => {
+  it("requires cloud credentials and the canonical HTTPS origin for deployments", () => {
+    vi.stubEnv("FLOWDAY_REQUIRE_CLOUD", "1");
+    vi.stubEnv("APP_ORIGIN", "http://flowday.example");
+    expect(() => cloudConfig()).toThrow(/HTTPS/);
+    vi.stubEnv("APP_ORIGIN", "https://flowday.example");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
+    expect(() => cloudConfig()).toThrow(/必须配置 Supabase/);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "test-key");
+    expect(cloudConfig()).toMatchObject({ url: "https://example.supabase.co" });
+  });
   it("keeps explicit local mode but rejects partial cloud configuration", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
