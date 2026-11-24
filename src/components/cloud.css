@@ -1,0 +1,123 @@
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg, #f7f8f3);
+}
+.auth-card {
+  width: min(100%, 460px);
+  padding: 36px;
+}
+.auth-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #285540;
+  font-size: 28px;
+  font-weight: 750;
+  text-decoration: none;
+  margin-bottom: 32px;
+}
+.auth-card h1 {
+  font-size: 26px;
+  margin: 0 0 12px;
+}
+.auth-card p {
+  line-height: 1.8;
+}
+.auth-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 24px 0;
+}
+.auth-card form,
+.auth-card label {
+  display: grid;
+  gap: 12px;
+}
+.auth-card form {
+  gap: 20px;
+}
+.auth-card input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dce3d6;
+  border-radius: 8px;
+  background: white;
+  color: #243c34;
+}
+.auth-card small {
+  color: #778873;
+}
+.cloud-message {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f1f4e9;
+  color: #526549;
+  overflow-wrap: anywhere;
+}
+.cloud-panel {
+  padding: 22px;
+  margin-bottom: 22px;
+}
+.cloud-panel h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+.cloud-panel p {
+  line-height: 1.7;
+}
+.cloud-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+.cloud-account {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cloud-counts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.cloud-counts span {
+  background: #eef2e6;
+  padding: 6px 10px;
+  border-radius: 7px;
+}
+.cloud-panel details {
+  margin: 12px 0;
+}
+.cloud-panel ul {
+  padding-left: 20px;
+  max-height: 180px;
+  overflow: auto;
+}
+.cloud-saving {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #285540;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  z-index: 110;
+  box-shadow: 0 3px 20px #0002;
+}
+@media (max-width: 700px) {
+  .auth-card {
+    padding: 24px;
+  }
+  .cloud-saving {
+    bottom: 80px;
+  }
+  .cloud-panel {
+    padding: 16px;
+  }
+}

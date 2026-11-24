@@ -1,0 +1,123 @@
+.execution-controls,
+.growth-report {
+  line-height: 1.65;
+}
+.execution-fields,
+.execution-dependencies {
+  border: 0;
+  padding: 0;
+  margin: 12px 0;
+  min-width: 0;
+}
+.execution-check {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.execution-check input,
+.execution-dependencies input {
+  accent-color: #467d5d;
+  flex-shrink: 0;
+}
+.execution-hint {
+  background: #f4eee0;
+  border-radius: 8px;
+  padding: 12px;
+  color: #675538;
+}
+.execution-controls .field {
+  margin-bottom: 12px;
+}
+.execution-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0;
+}
+.execution-preview {
+  border-top: 1px solid #dde6d6;
+  margin: 14px 0;
+  padding-top: 12px;
+}
+.execution-preview article {
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: #f3f6ed;
+  border-radius: 8px;
+}
+.execution-preview article p {
+  margin: 4px 0;
+}
+.execution-preview ul,
+.growth-report ul,
+.execution-history {
+  padding-inline-start: 23px;
+}
+.execution-details {
+  margin: 15px 0;
+  padding-top: 12px;
+  border-top: 1px solid #e1e7db;
+}
+.execution-details summary,
+.execution-preview summary {
+  cursor: pointer;
+  color: #38664e;
+  margin-bottom: 8px;
+}
+.execution-dependencies {
+  max-height: 145px;
+  overflow: auto;
+}
+.execution-dependencies label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.execution-history {
+  max-height: 195px;
+  overflow: auto;
+  font-size: 13px;
+}
+.execution-load {
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.execution-load span {
+  flex: 1 1 205px;
+}
+.growth-report {
+  padding: 18px 22px;
+  margin: 16px 0;
+}
+.growth-table {
+  overflow: auto;
+}
+.growth-table table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.growth-table th,
+.growth-table td {
+  padding: 8px;
+  border-bottom: 1px solid #edf0e7;
+}
+.growth-table tbody th {
+  font-weight: 500;
+}
+.growth-report small {
+  color: #52654e;
+}
+@media (max-width: 600px) {
+  .growth-report {
+    padding: 14px;
+  }
+  .growth-table th,
+  .growth-table td {
+    padding: 7px 5px;
+  }
+}

@@ -1,0 +1,187 @@
+.ai-coach {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #dce5d4;
+  border-radius: 14px;
+  background: #f8faf4;
+  color: var(--text, #283e33);
+}
+.ai-coach-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ai-coach p,
+.ai-coach li {
+  line-height: 1.8;
+}
+.ai-coach h3 {
+  margin: 22px 0 8px;
+  font-size: 17px;
+}
+.ai-coach h4 {
+  margin: 16px 0 6px;
+}
+.ai-coach ul {
+  padding-left: 22px;
+}
+.ai-coach-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.ai-coach-input {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.ai-coach-input label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.ai-guide {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce5d4;
+  border-radius: 10px;
+  background: #f1f5eb;
+}
+.ai-guide-group {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 8px 0;
+}
+.ai-guide-group legend {
+  padding: 0;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ai-guide-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ai-guide-option {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid #d0ddc8;
+  border-radius: 8px;
+  background: #fcfdf9;
+  color: #38503c;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ai-guide-option[aria-pressed="true"] {
+  color: #214a32;
+  border-color: #598069;
+  background: #dcebd9;
+  box-shadow: inset 0 0 0 1px #598069;
+}
+.ai-guide-option:focus-visible {
+  outline: 2px solid #467d5d;
+  outline-offset: 2px;
+}
+.ai-coach .ai-guide-extra {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+.ai-guide-extra[open] > summary {
+  margin-bottom: 6px;
+}
+.ai-coach textarea,
+.ai-coach select,
+.ai-coach input[type="date"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d9e1d1;
+  border-radius: 8px;
+  background: white;
+  color: inherit;
+}
+.ai-coach-input .ai-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  line-height: 1.7;
+}
+.ai-check input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  accent-color: #467d5d;
+}
+.ai-coach small {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #6b7c65;
+}
+.ai-error {
+  padding: 12px;
+  background: #fff0e9;
+  color: #8f4b36;
+  border-radius: 8px;
+}
+.ai-success {
+  padding: 12px;
+  background: #e8f2df;
+  border-radius: 8px;
+}
+.ai-preview {
+  border-top: 1px solid #dce5d4;
+  margin-top: 22px;
+  overflow-wrap: anywhere;
+}
+.ai-stage {
+  padding: 6px 14px;
+  border-left: 3px solid #a4bc96;
+  margin: 12px 0;
+  background: #f0f4e9;
+}
+.ai-confirm {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #dce5d4;
+}
+.ai-entry {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 20px;
+  align-items: center;
+}
+.ai-entry .button {
+  font-size: 12px;
+}
+.ai-coach details {
+  margin: 18px 0;
+}
+.ai-coach summary {
+  cursor: pointer;
+  color: #467d5d;
+}
+.ai-rule-fallback {
+  margin-top: 24px;
+  border-top: 1px solid #e2e7da;
+  padding-top: 16px;
+}
+.ai-rule-fallback > summary {
+  cursor: pointer;
+  color: #62735b;
+}
+@media (max-width: 700px) {
+  .ai-coach {
+    padding: 14px;
+  }
+  .ai-coach-tabs .button {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
