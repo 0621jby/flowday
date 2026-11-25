@@ -82,9 +82,15 @@ if [[ ${1:-} == rollback ]]; then
 fi
 [[ $# -eq 0 ]] || exit 2
 
-docker pull "$repository:main"
-candidate=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repository:main" |
-  awk -v prefix="$repository@" 'index($0,prefix)==1 {print; exit}')
+if [[ -z $current && -f ops/first-release-image ]]; then
+  candidate=$(read_release ops/first-release-image)
+  require_digest "$candidate" || { log "Invalid approved first-release image digest"; exit 1; }
+  docker pull "$candidate"
+else
+  docker pull "$repository:main"
+  candidate=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repository:main" |
+    awk -v prefix="$repository@" 'index($0,prefix)==1 {print; exit}')
+fi
 require_digest "$candidate" || { log "Invalid channel image digest"; exit 1; }
 [[ $candidate != "$current" && $candidate != "$(read_release ops/rejected)" ]] || exit 0
 

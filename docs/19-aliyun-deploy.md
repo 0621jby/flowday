@@ -15,7 +15,9 @@
 - 确认服务器上现有反向代理的端口和虚拟主机后，使用 [Nginx 示例](../deploy/aliyun/nginx-flowday.conf.example) 增加单独虚拟主机。后端仅绑定 `127.0.0.1:13100`。对已有配置做语法检查后再重载。页面和用户 API 不经代理缓存，静态资源使用 Next.js 原有的版本化路径。北京主机正式域名按阿里云要求完成备案后上线，早期可用 SSH 隧道访问回环地址做本地模式验收。HTTPS 是录入真实用户数据的上线条件。[阿里云域名与备案说明](https://help.aliyun.com/zh/simple-application-server/user-guide/manage-domain-names/)
 - 默认 Supabase 邮件只送达项目团队的预授权地址。个人验收可用控制台预先创建并确认的测试用户，面向普通用户自助注册时配置获准使用的 SMTP。生产验收分别记录控制台建号、应用自助注册、邮箱确认及登录的结果。[Supabase 邮件限制](https://supabase.com/docs/guides/auth/auth-smtp)
 
-本实例可使用 `sudo bash /opt/flowday/configure-runtime.sh` 一次录入运行设置。脚本验证带证书校验的数据库连接，并把镜像拉取凭证单独放在 `/etc/flowday/docker`。如果系统信任库无法验证 Supabase 的证书，将控制台下载的 CA 放入 `/etc/flowday/postgres-ca/prod-supabase.cer`，然后重试。PostgreSQL 客户端以固定镜像摘要运行，启动时只挂载数据库连接配置与 FlowDay 的运维目录。
+先将 Supabase Dashboard 的 Database Settings 提供的 CA 安装到 `/etc/flowday/certs/prod-ca-2021.crt`。证书目录由 root 管理，PostgreSQL 客户端只读挂载它，并使用 `sslmode=verify-full` 和明确的 `sslrootcert` 路径。运行 `sudo bash /opt/flowday/configure-runtime.sh --verify-db` 可隐藏输入数据库密码、验证服务器身份并执行只读查询。验证成功才保存数据库连接文件，这一步不会创建应用运行配置。
+
+首次部署使用 `sudo bash /opt/flowday/configure-runtime.sh --prepare-only` 暂存剩余设置。脚本会复用已验证的数据库连接和可读取私有镜像的 GitHub 凭证。确认备份可恢复、镜像中的 SQL 与已审查的文件逐一匹配后，管理员将镜像摘要写入 `ops/first-release-image`，再将 `runtime.pending` 发布为 `runtime.env`。镜像拉取配置单独保存于 `/etc/flowday/docker`，限制目录及配置文件的访问权限。Docker 未配置外部凭证存储时，JSON 文件仍包含可还原的 Base64 凭证。长期运行可使用适合无人值守服务器的外部凭证存储，并限定 GHCR 令牌为只读。 [Supabase TLS 配置](https://supabase.com/docs/guides/database/psql) · [Docker 凭证存储](https://docs.docker.com/reference/cli/docker/login/#credential-stores)
 
 个人 IP 验收可使用 [独立 HTTPS 代理](../deploy/aliyun/flowday-proxy.service) 和 [续签定时器](../deploy/aliyun/flowday-cert-renew.timer)。本实例的 80 端口由现有 Solar 服务提供，Certbot 只在它的静态目录写入 ACME 验证文件，FlowDay 代理独立监听 443。签发及续签演练通过后才启用代理，并从服务器外验证证书。IP 证书约六天到期，续签失败须及时处理。[Let’s Encrypt IP 证书](https://letsencrypt.org/2026/03/11/shorter-certs-certbot)
 

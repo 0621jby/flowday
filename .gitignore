@@ -10,4 +10,5 @@ coverage/
 test-results/
 playwright-report/
 /deploy/aliyun/runtime.env
+/deploy/aliyun/runtime.pending
 /deploy/aliyun/ops/

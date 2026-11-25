@@ -9,6 +9,6 @@ exec /usr/bin/docker run --rm -i \
   --env PGSERVICE --env PGSERVICEFILE --env PGPASSFILE --env PGCONNECT_TIMEOUT \
   --mount "type=bind,src=$PGSERVICEFILE,dst=$PGSERVICEFILE,readonly" \
   --mount "type=bind,src=$PGPASSFILE,dst=$PGPASSFILE,readonly" \
-  --mount type=bind,src=/etc/flowday/postgres-ca,dst=/etc/flowday/postgres-ca,readonly \
+  --mount type=bind,src=/etc/flowday/certs,dst=/etc/flowday/certs,readonly \
   --mount type=bind,src=/opt/flowday/ops,dst=/opt/flowday/ops \
   --entrypoint "$tool" "$FLOWDAY_PG_IMAGE" "$@"

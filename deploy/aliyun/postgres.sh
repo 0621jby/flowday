@@ -10,6 +10,7 @@ backup() (
   trap 'rm -f -- "$temporary"' EXIT
   pg_dump --format=custom --schema=public --schema=auth --schema=flowday_ops --file="$temporary"
   pg_restore --list "$temporary" >/dev/null
+  pg_restore --exit-on-error --file=/dev/null "$temporary"
   chmod 600 "$temporary"
   # Publish atomically and refuse to replace an existing backup.
   ln -- "$temporary" "$destination"
