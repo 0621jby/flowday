@@ -10,7 +10,6 @@ import {
   type PointerEvent,
 } from "react";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -73,7 +72,24 @@ export function PlanningCalendar({
   onSettings,
   notify,
 }: Props) {
-  const today = localDate();
+  const clock = new Date();
+  const today = localDate(clock);
+  const minuteNow =
+    clock.getHours() * 60 + clock.getMinutes() + clock.getSeconds() / 60;
+  const nextStart = Math.ceil(minuteNow / 5) * 5;
+  function elapsed(date: string, start?: number) {
+    return (
+      date < today ||
+      (date === today && start !== undefined && start < minuteNow)
+    );
+  }
+  const picker = useRef<HTMLDialogElement>(null);
+  const [slot, setSlot] = useState<{ date: string; start: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (slot && !picker.current?.open) picker.current?.showModal();
+  }, [slot]);
   const [selected, setSelected] = useState(today);
   const [mode, setMode] = useState<"day" | "week" | "month">("week");
   const [query, setQuery] = useState("");
@@ -109,13 +125,14 @@ export function PlanningCalendar({
   } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const autoRef = useRef<HTMLElement>(null);
-  const gridScroll = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (auto)
       autoRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [auto]);
   useEffect(() => {
-    if (window.matchMedia("(max-width:700px)").matches) setMode("day");
+    if (window.matchMedia("(max-width: 900px), (pointer: coarse)").matches)
+      setMode("day");
   }, []);
   useEffect(() => {
     if (draft)
@@ -243,6 +260,7 @@ export function PlanningCalendar({
     if (!task) return;
     const block = blockById(id);
     const duration = block ? block.end - block.start : task.minutes;
+    if (elapsed(date, minute ?? block?.start)) return;
     perform(
       minute === undefined
         ? { type: "date", taskId: id, date }
@@ -355,14 +373,7 @@ export function PlanningCalendar({
     <>
       <section className="page-heading">
         <div>
-          <div className="eyebrow">
-            <CalendarDays size={15} />
-            近期认真安排，远期留点弹性
-          </div>
-          <h1>给重要的事，留一个位置</h1>
-          <p>
-            周视图安排时间，月视图调整日期。建议精排未来 7–14 天，按月看方向。
-          </p>
+          <h1>计划日历</h1>
         </div>
         <button className="button secondary" onClick={() => onAdd(selected)}>
           <Plus size={16} />
@@ -468,10 +479,7 @@ export function PlanningCalendar({
       </div>
       <div className="calendar-tip">
         <GripVertical size={14} />
-        <span>
-          拖入安排 · 拖动改期 · 拉伸底边调整预约时长 ·
-          点击任务可编辑、删除或移出时间轴
-        </span>
+        <span>点空白时段选择任务，点已有安排可调整时间。</span>
       </div>
       {message && (
         <div className="calendar-error" role="alert">
@@ -503,9 +511,12 @@ export function PlanningCalendar({
                   return (
                     <div
                       key={day}
-                      className={`month-cell ${day.slice(0, 7) !== selected.slice(0, 7) ? "outside" : ""} ${day === selected ? "chosen" : ""}`}
+                      className={`month-cell ${day < today ? "past" : ""} ${day.slice(0, 7) !== selected.slice(0, 7) ? "outside" : ""} ${day === selected ? "chosen" : ""}`}
                       onDragOver={(e) => {
-                        if (dragRef.current) {
+                        if (
+                          dragRef.current &&
+                          !elapsed(day, blockById(dragRef.current.id)?.start)
+                        ) {
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "move";
                         }
@@ -574,7 +585,7 @@ export function PlanningCalendar({
               </div>
             </>
           ) : (
-            <div className="calendar-scroll" ref={gridScroll}>
+            <div className="calendar-scroll">
               <div
                 className={`time-calendar ${mode === "day" ? "single-day" : ""}`}
                 style={{
@@ -625,6 +636,11 @@ export function PlanningCalendar({
                     style={{ height: gridHeight }}
                     onDragOver={(e) => {
                       if (!dragRef.current) return;
+                      if (elapsed(day, gridMinute(e))) {
+                        setHover(null);
+                        e.dataTransfer.dropEffect = "none";
+                        return;
+                      }
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "move";
                       const task = taskById(dragRef.current.id);
@@ -645,20 +661,56 @@ export function PlanningCalendar({
                     }}
                     onDrop={(e) => drop(e, day, gridMinute(e))}
                   >
-                    {hours.map((h) => (
-                      <button
-                        key={h}
-                        className="hour-slot"
-                        style={{ top: (h - startHour) * HOUR, height: HOUR }}
-                        aria-label={`${day} ${clockTime(h * 60)} 安排任务`}
-                        onClick={() => {
-                          setSelected(day);
-                          const first = queue.find((t) => !blockById(t.id));
-                          if (first) selectTask(first, day, h * 60);
-                          else setMessage("从右侧选择任务安排，或者先新建任务");
+                    {day <= today && (
+                      <div
+                        className="elapsed-time"
+                        aria-hidden="true"
+                        style={{
+                          height:
+                            day < today
+                              ? gridHeight
+                              : Math.min(
+                                  gridHeight,
+                                  Math.max(
+                                    0,
+                                    ((minuteNow - startHour * 60) / 60) * HOUR,
+                                  ),
+                                ),
                         }}
                       />
-                    ))}
+                    )}
+                    {day === today &&
+                      minuteNow >= startHour * 60 &&
+                      minuteNow < endHour * 60 && (
+                        <div
+                          className="now-line"
+                          aria-label={`现在 ${clockTime(Math.floor(minuteNow))}`}
+                          style={{
+                            top: ((minuteNow - startHour * 60) / 60) * HOUR,
+                          }}
+                        />
+                      )}
+                    {hours.map((h) => {
+                      const start =
+                        day === today ? Math.max(h * 60, nextStart) : h * 60;
+                      const end = (h + 1) * 60;
+                      if (day < today || start >= end) return null;
+                      return (
+                        <button
+                          key={h}
+                          className="hour-slot"
+                          style={{
+                            top: (start / 60 - startHour) * HOUR,
+                            height: ((end - start) / 60) * HOUR,
+                          }}
+                          aria-label={`${day} ${clockTime(start)} 安排任务`}
+                          onClick={() => {
+                            setSelected(day);
+                            setSlot({ date: day, start });
+                          }}
+                        />
+                      );
+                    })}
                     {state.fixedTimes
                       ?.filter(
                         (b) =>
@@ -907,6 +959,63 @@ export function PlanningCalendar({
           </section>
         </aside>
       </div>
+      <dialog
+        className="calendar-picker"
+        ref={picker}
+        onClose={() => setSlot(null)}
+        aria-labelledby="slot-title"
+      >
+        {slot && (
+          <>
+            <header>
+              <h2 id="slot-title">
+                {slot.date} · {clockTime(slot.start)}
+              </h2>
+              <button
+                autoFocus
+                className="icon-btn"
+                aria-label="关闭任务选择"
+                onClick={() => picker.current?.close()}
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="slot-tasks">
+              {state.tasks
+                .filter(
+                  (t) =>
+                    isPending(t) &&
+                    t.id !== state.session?.taskId &&
+                    !blockById(t.id)?.locked &&
+                    !state.tasks.some((c) => c.execution?.parentId === t.id),
+                )
+                .map((task) => (
+                  <button
+                    className="calendar-queue-task"
+                    key={task.id}
+                    onClick={() => {
+                      picker.current?.close();
+                      selectTask(task, slot.date, slot.start);
+                    }}
+                  >
+                    <strong>{task.title}</strong>
+                    <small>{task.minutes} 分钟</small>
+                  </button>
+                ))}
+            </div>
+            <button
+              className="inline-add"
+              onClick={() => {
+                picker.current?.close();
+                onAdd(slot.date);
+              }}
+            >
+              <Plus size={15} />
+              新建当天任务
+            </button>
+          </>
+        )}
+      </dialog>
       {draft && (
         <section
           className="panel calendar-editor"

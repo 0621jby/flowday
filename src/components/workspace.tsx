@@ -616,17 +616,6 @@ export function Workspace({ account }: { account?: Account }) {
             )}
           </header>
           <main className="workspace-content" id="main">
-            {account && view !== "settings" && (
-              <div className="soft-note">
-                <span>云端账户 · {account.email}</span>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("settings")}
-                >
-                  账户与本地数据迁移
-                </button>
-              </div>
-            )}
             {account && (!online || pending || syncIssue) && (
               <section
                 className="soft-note execution-load"
@@ -765,55 +754,6 @@ export function Workspace({ account }: { account?: Account }) {
                 </button>
               </div>
             )}
-            {(
-              ["today", "goals", "plan", "tasks", "insights"] as View[]
-            ).includes(view) && (
-              <div className="ai-entry" aria-label="AI 教练入口">
-                <span className="muted">
-                  <Sparkles size={14} /> AI 执行教练
-                </span>
-                <button
-                  className="button secondary"
-                  onClick={() =>
-                    setAiRequest({
-                      mode: "goal",
-                      ...(goalFilter ? { goalId: goalFilter } : {}),
-                    })
-                  }
-                >
-                  {goalFilter ? "AI 拆解此目标" : "AI 拆解新目标"}
-                </button>
-                <button
-                  className="button secondary"
-                  onClick={() => setAiRequest({ mode: "plan" })}
-                >
-                  AI 调整今日计划
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() => setAiRequest({ mode: "profile" })}
-                >
-                  查看执行画像
-                </button>
-              </div>
-            )}
-            {(view === "today" || view === "plan") && (
-              <div className="soft-note execution-load">
-                <Clock3 size={17} />
-                <span>
-                  {(() => {
-                    const load = loadForDay(state, today, new Date(now));
-                    return `今日剩余 ${load.available} 分钟 · 待执行 ${Math.round(load.requested)} 分钟 · 高优先级 ${load.high} 项${load.over > 0 ? " · 建议留出缓冲" : ""}`;
-                  })()}
-                </span>
-                <button
-                  className="button secondary"
-                  onClick={() => openAdaptive()}
-                >
-                  自适应排程
-                </button>
-              </div>
-            )}
             {view === "today" && (
               <>
                 <section className="page-heading">
@@ -827,9 +767,8 @@ export function Workspace({ account }: { account?: Account }) {
                       })}
                     </div>
                     <h1>
-                      把今天，过得从容一点<span className="sun-doodle">☀</span>
+                      我的一天<span className="sun-doodle">☀</span>
                     </h1>
-                    <p>不需要一次完成所有事。专注当下，向前一小步。</p>
                   </div>
                   <button
                     className="button secondary"
@@ -847,28 +786,25 @@ export function Workspace({ account }: { account?: Account }) {
                       <div className="hero-top">
                         <span>
                           <span className="pulse-dot" />
-                          此刻，专注这一件事
-                        </span>
-                        <span className="hero-pill">
-                          {topTask ? "最重要的下一步" : "留一点空间给自己"}
+                          当前任务
                         </span>
                       </div>
                       <div className="hero-content">
                         <div className="hero-copy">
                           <h2>
-                            {topTask?.title ?? "今天的重点，已经完成了。"}
+                            {topTask?.title ??
+                              (doneToday.length
+                                ? "今日任务已完成"
+                                : "今天还没有任务")}
                           </h2>
-                          <p>
-                            {topTask?.notes ||
-                              "你不必把每一分钟都填满。休息也是节奏的一部分。"}
-                          </p>
+                          {topTask?.notes && <p>{topTask.notes}</p>}
                           <div className="hero-meta">
-                            <span>
-                              <Clock3 size={14} />
-                              {topTask
-                                ? `预计 ${topTask.minutes} 分钟`
-                                : "享受一点留白"}
-                            </span>
+                            {topTask && (
+                              <span>
+                                <Clock3 size={14} />
+                                预计 {topTask.minutes} 分钟
+                              </span>
+                            )}
                             {topTask && goalOf(topTask) && (
                               <span>
                                 <Target size={14} />
@@ -911,10 +847,6 @@ export function Workspace({ account }: { account?: Account }) {
                           <span className="star s1">✧</span>
                           <span className="star s2">✦</span>
                         </div>
-                      </div>
-                      <div className="hero-footer">
-                        <Leaf size={13} />
-                        开始的力量，往往比准备好更重要。
                       </div>
                     </section>
                     <section className="panel task-panel">
@@ -1153,14 +1085,12 @@ export function Workspace({ account }: { account?: Account }) {
             {view === "tasks" && (
               <>
                 <PageHeading
-                  eyebrow="留住想法，慢慢完成"
                   title={
                     goalFilter
                       ? (state.goals.find((g) => g.id === goalFilter)?.title ??
                         "目标任务")
-                      : "给每件事，一个去处"
+                      : "所有任务"
                   }
-                  description="把脑海中的事情放下来，给当下腾一点空间。"
                   action={
                     <button
                       className="button primary"
@@ -1279,9 +1209,7 @@ export function Workspace({ account }: { account?: Account }) {
             {view === "goals" && (
               <>
                 <PageHeading
-                  eyebrow="看见更远，也走好今天"
-                  title="让想做的事，慢慢发生"
-                  description="目标给你方向，小行动让你靠近。"
+                  title="我的目标"
                   action={
                     <button
                       className="button primary"
@@ -1381,11 +1309,7 @@ export function Workspace({ account }: { account?: Account }) {
             </div>
             {view === "insights" && (
               <>
-                <PageHeading
-                  eyebrow="从真实记录里，认识自己的节奏"
-                  title="每一点进步，都看得见"
-                  description="只展示你实际记录的数据，不推测未记录的努力。"
-                />
+                <PageHeading title="数据洞察" />
                 <div className="metric-grid">
                   <Metric
                     title="累计已完成"
@@ -1438,8 +1362,7 @@ export function Workspace({ account }: { account?: Account }) {
             {view === "settings" && (
               <>
                 <PageHeading
-                  eyebrow="让 FlowDay 适合你的生活"
-                  title="你的节奏，你来决定"
+                  title="个人设置"
                   description={
                     account
                       ? "偏好与业务数据保存在当前云端账户。"
@@ -1528,6 +1451,56 @@ export function Workspace({ account }: { account?: Account }) {
                   </p>
                 </section>
               </>
+            )}
+            {(view === "plan" ||
+              (view === "today" && pendingToday.length > 0)) && (
+              <div className="soft-note execution-load">
+                <Clock3 size={17} />
+                <span>
+                  {(() => {
+                    const load = loadForDay(state, today, new Date(now));
+                    return `今日剩余 ${load.available} 分钟 · 待执行 ${Math.round(load.requested)} 分钟 · 高优先级 ${load.high} 项${load.over > 0 ? " · 建议留出缓冲" : ""}`;
+                  })()}
+                </span>
+                <button
+                  className="button secondary"
+                  onClick={() => openAdaptive()}
+                >
+                  自适应排程
+                </button>
+              </div>
+            )}
+            {(
+              ["today", "goals", "plan", "tasks", "insights"] as View[]
+            ).includes(view) && (
+              <div className="ai-entry" aria-label="AI 教练入口">
+                <span className="muted">
+                  <Sparkles size={14} /> AI 执行教练
+                </span>
+                <button
+                  className="button secondary"
+                  onClick={() =>
+                    setAiRequest({
+                      mode: "goal",
+                      ...(goalFilter ? { goalId: goalFilter } : {}),
+                    })
+                  }
+                >
+                  {goalFilter ? "AI 拆解此目标" : "AI 拆解新目标"}
+                </button>
+                <button
+                  className="button secondary"
+                  onClick={() => setAiRequest({ mode: "plan" })}
+                >
+                  AI 调整今日计划
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => setAiRequest({ mode: "profile" })}
+                >
+                  查看执行画像
+                </button>
+              </div>
             )}
           </main>
         </div>
@@ -2061,22 +2034,19 @@ export function Workspace({ account }: { account?: Account }) {
   );
 }
 function PageHeading({
-  eyebrow,
   title,
   description,
   action,
 }: {
-  eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   return (
     <section className="page-heading">
       <div>
-        <div className="eyebrow">{eyebrow}</div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
       {action}
     </section>

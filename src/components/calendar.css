@@ -729,3 +729,66 @@
     #f3f5ef 8px
   );
 }
+
+.elapsed-time {
+  position: absolute;
+  inset: 0 0 auto;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, #e8ebe4 0 1px, #f3f5f0 1px 7px);
+}
+.month-cell.past {
+  background-color: #f1f3ee;
+}
+.now-line {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 2px solid #398363;
+  z-index: 3;
+  pointer-events: none;
+}
+.calendar-picker {
+  margin: auto;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: min(360px, 92vw);
+  color: inherit;
+}
+.calendar-picker::backdrop {
+  background: #233a2a55;
+}
+.calendar-picker header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.calendar-picker h2 {
+  font-size: 16px;
+}
+.slot-tasks {
+  max-height: 48dvh;
+  overflow-y: auto;
+}
+.slot-tasks button {
+  cursor: pointer;
+  justify-content: space-between;
+}
+@media (max-width: 900px), (pointer: coarse) {
+  .calendar-scroll {
+    max-height: min(56dvh, 520px);
+    overscroll-behavior: auto;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+  .calendar-editor {
+    scroll-margin-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+  .hour-axis,
+  .time-corner {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+  }
+  .time-corner {
+    z-index: 9;
+  }
+}
