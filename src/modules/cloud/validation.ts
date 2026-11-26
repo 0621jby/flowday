@@ -1,3 +1,4 @@
+import { blockKey } from "../core/model";
 import { stateSchema, type AppState } from "../core/model";
 import { validateExecutionData } from "../core/execution-validation";
 
@@ -30,7 +31,7 @@ export function validateWorkspace(input: unknown): AppState {
   unique(s.goals.map((g) => g.id));
   unique(s.events.map((e) => e.id));
   unique(s.reviews.map((r) => r.date));
-  unique(s.blocks.map((b) => b.taskId));
+  unique(s.blocks.map(blockKey));
   const tasks = new Map(s.tasks.map((t) => [t.id, t]));
   const goals = new Set(s.goals.map((g) => g.id));
   if (s.settings.dayStart >= s.settings.dayEnd)
@@ -51,12 +52,7 @@ export function validateWorkspace(input: unknown): AppState {
   for (const b of s.blocks) {
     day(b.date);
     const task = tasks.get(b.taskId);
-    if (
-      !task ||
-      task.status === "done" ||
-      task.date !== b.date ||
-      b.start >= b.end
-    )
+    if (!task || task.status === "done" || b.start >= b.end)
       throw new Error("排程与任务不一致。");
   }
   const blocks = [...s.blocks].sort(

@@ -28,7 +28,8 @@ function canMove(state: AppState, task: Task) {
   return (
     isPending(task) &&
     state.session?.taskId !== task.id &&
-    !state.blocks.some((b) => b.taskId === task.id && b.locked)
+    !state.blocks.some((b) => b.taskId === task.id && b.locked) &&
+    state.blocks.filter((b) => b.taskId === task.id).length <= 1
   );
 }
 export function createSplit(
@@ -45,6 +46,8 @@ export function createSplit(
     state.tasks.some((t) => t.execution?.parentId === taskId)
   )
     throw new Error("请选择未执行、未锁定且尚未拆分的原任务。");
+  if (state.blocks.filter((b) => b.taskId === taskId).length > 1)
+    throw new Error("请先在日历中调整该任务的分段安排。");
   const existing = state.blocks.find((b) => b.taskId === taskId);
   if (
     state.tasks.some(

@@ -1,10 +1,10 @@
-import { type AppState, localDate } from "../core/model";
+import { type AppState, blockKey, localDate } from "../core/model";
 import { schedule, type Slot } from "./scheduler";
 import { dayAvailability, planningRatio } from "./availability";
 import { isPending } from "../core/execution";
-export type CalendarChange =
+export type CalendarChange = { blockId?: string } & (
   | {
-      type: "schedule";
+      type: "schedule" | "append";
       taskId: string;
       date: string;
       start: number;
@@ -12,7 +12,8 @@ export type CalendarChange =
     }
   | { type: "date"; taskId: string; date: string }
   | { type: "unschedule"; taskId: string }
-  | { type: "lock"; taskId: string; locked: boolean };
+  | { type: "lock"; taskId: string; locked: boolean }
+);
 export function parseDay(day: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("请选择有效日期");
   const [y, m, d] = day.split("-").map(Number);
@@ -84,13 +85,32 @@ export function applyCalendarChange(
   if (!isPending(task)) throw new Error("已完成任务不能重新安排，请先重新打开");
   if (state.session?.taskId === task.id)
     throw new Error("请先结束当前专注，再调整这项任务");
-  const previous = state.blocks.find((b) => b.taskId === task.id);
+  const segments = state.blocks.filter((b) => b.taskId === task.id);
+  const previous =
+    change.type === "append"
+      ? undefined
+      : segments.find((b) =>
+          change.blockId
+            ? blockKey(b) === change.blockId
+            : segments.length === 1,
+        );
+  if (change.type !== "append" && change.blockId && !previous)
+    throw new Error("这段安排已不存在，请重新打开日历");
+  if (
+    change.type === "append" &&
+    (!change.blockId ||
+      state.blocks.some((b) => blockKey(b) === change.blockId))
+  )
+    throw new Error("无法新增该时间块，请重新选择时段");
+  if (segments.length > 1 && change.type !== "append" && !change.blockId)
+    throw new Error("这项任务有多段安排，请在日历中选择要调整的时间块");
+  const keep = (b: AppState["blocks"][number]) => b !== previous;
   if (change.type === "lock") {
     if (!previous) throw new Error("先为任务安排一个时间块");
     return {
       ...state,
       blocks: state.blocks.map((b) =>
-        b.taskId === task.id ? { ...b, locked: change.locked } : b,
+        b === previous ? { ...b, locked: change.locked } : b,
       ),
     };
   }
@@ -98,15 +118,20 @@ export function applyCalendarChange(
   if (change.type === "unschedule")
     return {
       ...state,
-      blocks: state.blocks.filter((b) => b.taskId !== task.id),
+      blocks: state.blocks.filter(keep),
     };
   parseDay(change.date);
   if (change.date < localDate(now)) throw new Error("请选择今天或未来的日期");
   if (task.execution?.dueDate && change.date > task.execution.dueDate)
     throw new Error("计划日期超过任务截止日期，请调整日期。");
   const proposal =
-    change.type === "schedule"
+    change.type === "schedule" || change.type === "append"
       ? {
+          ...(change.type === "append"
+            ? { id: change.blockId }
+            : previous?.id
+              ? { id: previous.id }
+              : {}),
           taskId: task.id,
           date: change.date,
           start: change.start,
@@ -133,7 +158,9 @@ export function applyCalendarChange(
     for (const dependency of task.execution?.dependencies ?? []) {
       if (state.tasks.find((t) => t.id === dependency)?.status === "done")
         continue;
-      const reserved = state.blocks.find((b) => b.taskId === dependency);
+      const reserved = state.blocks
+        .filter((b) => b.taskId === dependency)
+        .sort((a, b) => b.date.localeCompare(a.date) || b.end - a.end)[0];
       if (
         !reserved ||
         reserved.date < localDate(now) ||
@@ -158,7 +185,7 @@ export function applyCalendarChange(
     )
       throw new Error("这个时间会排在已预约的后续任务之后。");
     const others = state.blocks.filter(
-      (b) => b.taskId !== task.id && b.date === proposal.date,
+      (b) => keep(b) && b.date === proposal.date,
     );
     const conflict = others.find(
       (b) => proposal.start < b.end && proposal.end > b.start,
@@ -178,12 +205,11 @@ export function applyCalendarChange(
   return {
     ...state,
     tasks: state.tasks.map((t) =>
-      t.id === task.id ? { ...t, date: change.date } : t,
+      t.id === task.id && !segments.some(keep)
+        ? { ...t, date: change.date }
+        : t,
     ),
-    blocks: [
-      ...state.blocks.filter((b) => b.taskId !== task.id),
-      ...(proposal ? [proposal] : []),
-    ],
+    blocks: [...state.blocks.filter(keep), ...(proposal ? [proposal] : [])],
   };
 }
 export function fillDay(
@@ -250,14 +276,20 @@ export function undoCalendar(
   const changed = state.tasks
     .filter(
       (t) =>
-        JSON.stringify(state.blocks.find((b) => b.taskId === t.id)) !==
-          JSON.stringify(before.blocks.find((b) => b.taskId === t.id)) ||
+        JSON.stringify(state.blocks.filter((b) => b.taskId === t.id)) !==
+          JSON.stringify(before.blocks.filter((b) => b.taskId === t.id)) ||
         before.tasks.find((p) => p.id === t.id)?.date !== t.date,
     )
     .map((t) => t.id);
   if (state.session && changed.includes(state.session.taskId))
     throw new Error("请先结束专注再撤销安排");
-  for (const block of before.blocks.filter((b) => changed.includes(b.taskId)))
+  for (const block of before.blocks.filter(
+    (b) =>
+      changed.includes(b.taskId) &&
+      !state.blocks.some(
+        (current) => JSON.stringify(current) === JSON.stringify(b),
+      ),
+  ))
     validTime(block.date, block.start, block.end, now);
   return { ...state, tasks: before.tasks, blocks: before.blocks };
 }

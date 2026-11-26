@@ -264,18 +264,19 @@ export function loadForDay(state: AppState, day: string, now = new Date()) {
       t.execution?.parentId ? [t.execution.parentId] : [],
     ),
   );
+  const dayBlocks = state.blocks.filter((b) => b.date === day);
   const tasks = state.tasks.filter(
-    (t) => isPending(t) && t.date === day && !parents.has(t.id),
+    (t) =>
+      isPending(t) &&
+      !parents.has(t.id) &&
+      (t.date === day || dayBlocks.some((b) => b.taskId === t.id)),
   );
   const available = availableMinutes(state, day, now);
   const safeBudget = Math.floor(available * planningRatio(state));
-  const blocks = new Map(
-    state.blocks.filter((b) => b.date === day).map((b) => [b.taskId, b]),
-  );
   const minute =
     day === localDate(now) ? now.getHours() * 60 + now.getMinutes() : 0;
   const requested = tasks.reduce((sum, t) => {
-    const block = blocks.get(t.id);
+    const segments = state.blocks.filter((b) => b.taskId === t.id);
     const active =
       state.session?.taskId === t.id
         ? state.session.accumulated +
@@ -283,11 +284,24 @@ export function loadForDay(state: AppState, day: string, now = new Date()) {
             ? Math.max(0, now.getTime() - state.session.startedAt) / 1000
             : 0)
         : 0;
+    const reserved = segments
+      .filter((b) => b.date === day && b.end > minute)
+      .reduce((n, b) => n + b.end - Math.max(b.start, minute), 0);
+    if (segments.length <= 1)
+      return (
+        sum +
+        (reserved ||
+          (t.date === day
+            ? Math.max(5, t.minutes - Math.floor(active / 60))
+            : 0))
+      );
+    const alreadyPlanned = segments.reduce((n, b) => n + b.end - b.start, 0);
     return (
       sum +
-      (block && block.end > minute
-        ? block.end - Math.max(block.start, minute)
-        : Math.max(5, t.minutes - Math.floor(active / 60)))
+      reserved +
+      (t.date === day
+        ? Math.max(0, t.minutes - alreadyPlanned - Math.floor(active / 60))
+        : 0)
     );
   }, 0);
   return {

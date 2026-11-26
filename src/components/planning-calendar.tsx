@@ -1,6 +1,7 @@
 "use client";
 import { TimeInput } from "./time-controls";
 import "./calendar.css";
+import { MobileCalendar } from "./mobile-calendar";
 import { isPending } from "@/modules/core/execution";
 import {
   dayAvailability,
@@ -26,7 +27,12 @@ import {
   Unlock,
   X,
 } from "lucide-react";
-import { type AppState, type Task, localDate } from "@/modules/core/model";
+import {
+  type AppState,
+  type Task,
+  blockKey,
+  localDate,
+} from "@/modules/core/model";
 import {
   addDays,
   applyCalendarChange,
@@ -40,7 +46,8 @@ import {
   type CalendarChange,
 } from "@/modules/planning/calendar";
 import { clockTime, type ScheduleResult } from "@/modules/planning/scheduler";
-type Props = {
+export type CalendarProps = {
+  accountMode?: boolean;
   state: AppState;
   update: (fn: (s: AppState) => AppState) => Promise<boolean>;
   onAdd: (date: string) => void;
@@ -50,6 +57,7 @@ type Props = {
   notify: (text: string) => void;
 };
 type Draft = {
+  blockId?: string;
   taskId: string;
   date: string;
   start: number;
@@ -57,6 +65,7 @@ type Draft = {
   revision: number;
 };
 type Resize = {
+  blockId: string;
   taskId: string;
   date: string;
   start: number;
@@ -67,7 +76,22 @@ type Resize = {
 };
 const MIME = "application/x-flowday-task";
 const HOUR = 64;
-export function PlanningCalendar({
+export function PlanningCalendar(props: CalendarProps) {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 700px), (pointer: coarse)");
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  return compact ? (
+    <MobileCalendar {...props} />
+  ) : (
+    <DesktopCalendar {...props} />
+  );
+}
+function DesktopCalendar({
   state,
   update,
   onAdd,
@@ -75,7 +99,7 @@ export function PlanningCalendar({
   onDeleteTask,
   onSettings,
   notify,
-}: Props) {
+}: CalendarProps) {
   const clock = new Date();
   const today = localDate(clock);
   const minuteNow =
@@ -87,19 +111,6 @@ export function PlanningCalendar({
       (date === today && start !== undefined && start < minuteNow)
     );
   }
-  const [poolOpen, setPoolOpen] = useState(false);
-  const [chosenId, setChosenId] = useState("");
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 900px), (pointer: coarse)");
-    const syncLayout = () => {
-      setCompact(media.matches);
-      if (!media.matches) setChosenId("");
-    };
-    syncLayout();
-    media.addEventListener("change", syncLayout);
-    return () => media.removeEventListener("change", syncLayout);
-  }, []);
   const picker = useRef<HTMLDialogElement>(null);
   const [slot, setSlot] = useState<{
     date: string;
@@ -148,6 +159,7 @@ export function PlanningCalendar({
   const resizeRef = useRef<Resize | null>(null);
   const dragRef = useRef<{
     id: string;
+    blockId?: string;
     revision: number;
     offset: number;
   } | null>(null);
@@ -209,11 +221,9 @@ export function PlanningCalendar({
   const gridHeight = (endHour - startHour) * HOUR;
   const taskById = (id: string) => state.tasks.find((t) => t.id === id);
   const blockById = (id: string) => state.blocks.find((b) => b.taskId === id);
-  const chosen = state.tasks.find((t) => t.id === chosenId && isPending(t));
-  const chosenBlock = chosen && blockById(chosen.id);
-  const duration = chosenBlock
-    ? chosenBlock.end - chosenBlock.start
-    : (chosen?.minutes ?? 0);
+  const multiple = (id: string) =>
+    state.blocks.filter((b) => b.taskId === id).length > 1;
+  const segment = (id?: string) => state.blocks.find((b) => blockKey(b) === id);
   const queue = state.tasks.filter(
     (t) =>
       isPending(t) &&
@@ -255,25 +265,36 @@ export function PlanningCalendar({
     task: Task,
     date = task.date || selected,
     start?: number,
+    block = blockById(task.id),
   ) {
-    const block = blockById(task.id);
     setDraft({
       taskId: task.id,
       date,
+      blockId: block && blockKey(block),
       start: start ?? block?.start ?? state.settings.dayStart * 60,
       duration: block ? block.end - block.start : task.minutes,
       revision: state.revision,
     });
     setMessage("");
   }
-  function startDrag(e: DragEvent, id: string, offset = 0) {
-    if (blockById(id)?.locked || state.session?.taskId === id) {
+  function startDrag(
+    e: DragEvent,
+    id: string,
+    offset = 0,
+    block = blockById(id),
+  ) {
+    if (block?.locked || state.session?.taskId === id) {
       e.preventDefault();
       return;
     }
     e.dataTransfer.setData(MIME, id);
     e.dataTransfer.effectAllowed = "move";
-    dragRef.current = { id, revision: state.revision, offset };
+    dragRef.current = {
+      id,
+      blockId: block && blockKey(block),
+      revision: state.revision,
+      offset,
+    };
     setMessage("");
   }
   function drop(e: DragEvent, date: string, minute?: number) {
@@ -288,15 +309,16 @@ export function PlanningCalendar({
     }
     const task = taskById(id);
     if (!task) return;
-    const block = blockById(id);
+    const block = segment(drag.blockId);
     const duration = block ? block.end - block.start : task.minutes;
     if (elapsed(date, minute ?? block?.start)) return;
     perform(
       minute === undefined
-        ? { type: "date", taskId: id, date }
+        ? { type: "date", taskId: id, blockId: drag.blockId, date }
         : {
             type: "schedule",
             taskId: id,
+            blockId: drag.blockId,
             date,
             start: minute,
             end: minute + duration,
@@ -326,6 +348,7 @@ export function PlanningCalendar({
     e.currentTarget.setPointerCapture(e.pointerId);
     const value = {
       ...block,
+      blockId: blockKey(block),
       originalEnd: block.end,
       y: e.clientY,
       revision: state.revision,
@@ -361,6 +384,7 @@ export function PlanningCalendar({
         {
           type: "schedule",
           taskId: current.taskId,
+          blockId: current.blockId,
           date: current.date,
           start: current.start,
           end: current.end,
@@ -523,35 +547,16 @@ export function PlanningCalendar({
           </button>
         </div>
       )}
-      <div className={`calendar-layout ${compact ? "compact-layout" : ""}`}>
+      <div className="calendar-layout">
         <aside className="calendar-side">
           <section className="panel calendar-queue">
-            {compact ? (
-              <button
-                type="button"
-                className="pool-toggle"
-                aria-expanded={poolOpen}
-                aria-controls="pool-options"
-                onClick={() => setPoolOpen(!poolOpen)}
-              >
-                <strong>{chosen ? chosen.title : "选择要安排的任务"}</strong>
-                <span>
-                  {poolOpen
-                    ? "收起"
-                    : chosen
-                      ? "更换任务"
-                      : `任务池 · ${queue.length}`}
-                </span>
-              </button>
-            ) : (
-              <div className="section-heading">
-                <h2>
-                  任务池 <span className="count-badge">{queue.length}</span>
-                </h2>
-                <GripVertical size={17} />
-              </div>
-            )}
-            <div id="pool-options" hidden={compact && !poolOpen}>
+            <div className="section-heading">
+              <h2>
+                任务池 <span className="count-badge">{queue.length}</span>
+              </h2>
+              <GripVertical size={17} />
+            </div>
+            <div id="pool-options">
               <label className="calendar-search">
                 <Search size={14} />
                 <input
@@ -578,6 +583,7 @@ export function PlanningCalendar({
                     className="calendar-queue-task"
                     key={task.id}
                     draggable={
+                      !multiple(task.id) &&
                       !blockById(task.id)?.locked &&
                       state.session?.taskId !== task.id
                     }
@@ -586,23 +592,11 @@ export function PlanningCalendar({
                       dragRef.current = null;
                       setHover(null);
                     }}
-                    onClick={() => {
-                      if (
-                        !compact ||
-                        blockById(task.id)?.locked ||
-                        task.id === state.session?.taskId ||
-                        state.tasks.some(
-                          (t) => t.execution?.parentId === task.id,
-                        )
-                      ) {
-                        selectTask(task, selected);
-                        return;
-                      }
-                      setChosenId(task.id);
-                      setPoolOpen(false);
-                      setDraft(null);
-                      setMessage("");
-                    }}
+                    onClick={() =>
+                      multiple(task.id)
+                        ? onEditTask(task)
+                        : selectTask(task, selected)
+                    }
                   >
                     <GripVertical size={14} />
                     <div>
@@ -628,16 +622,6 @@ export function PlanningCalendar({
                 添加任务
               </button>
             </div>
-            {compact && chosen && !poolOpen && (
-              <div className="pool-next">
-                <span>
-                  {mode === "month" ? "点日期，再选时段" : "点日历中的空白时段"}
-                </span>
-                <button className="text-button" onClick={() => setChosenId("")}>
-                  取消选择
-                </button>
-              </div>
-            )}
           </section>
           <section className="panel day-budget">
             <h2>{selected.slice(5)} · 已预约 / 可用</h2>
@@ -682,7 +666,12 @@ export function PlanningCalendar({
               <div className="month-grid">
                 {visibleDays.map((day) => {
                   const tasks = state.tasks.filter(
-                    (t) => t.date === day && !t.execution?.abandonedAt,
+                    (t) =>
+                      (t.date === day ||
+                        state.blocks.some(
+                          (b) => b.taskId === t.id && b.date === day,
+                        )) &&
+                      !t.execution?.abandonedAt,
                   );
                   const load = dayLoad(state, day);
                   return (
@@ -692,7 +681,7 @@ export function PlanningCalendar({
                       onDragOver={(e) => {
                         if (
                           dragRef.current &&
-                          !elapsed(day, blockById(dragRef.current.id)?.start)
+                          !elapsed(day, segment(dragRef.current.blockId)?.start)
                         ) {
                           e.preventDefault();
                           e.dataTransfer.dropEffect = "move";
@@ -703,11 +692,7 @@ export function PlanningCalendar({
                       <button
                         className={`month-date ${day === today ? "is-today" : ""}`}
                         aria-label={`选择 ${day}`}
-                        onClick={() => {
-                          setSelected(day);
-                          if (chosen && mode === "month" && day >= today)
-                            setMode("day");
-                        }}
+                        onClick={() => setSelected(day)}
                       >
                         {Number(day.slice(-2))}
                         <small>{load ? `${load}分` : ""}</small>
@@ -719,13 +704,31 @@ export function PlanningCalendar({
                           draggable={
                             isPending(task) && !blockById(task.id)?.locked
                           }
-                          onDragStart={(e) => startDrag(e, task.id)}
+                          onDragStart={(e) =>
+                            startDrag(
+                              e,
+                              task.id,
+                              0,
+                              state.blocks.find(
+                                (b) => b.taskId === task.id && b.date === day,
+                              ),
+                            )
+                          }
                           onDragEnd={() => {
                             dragRef.current = null;
                             setHover(null);
                           }}
                           disabled={!isPending(task)}
-                          onClick={() => selectTask(task, day)}
+                          onClick={() =>
+                            selectTask(
+                              task,
+                              day,
+                              undefined,
+                              state.blocks.find(
+                                (b) => b.taskId === task.id && b.date === day,
+                              ),
+                            )
+                          }
                           title={task.title}
                         >
                           <i
@@ -834,7 +837,7 @@ export function PlanningCalendar({
                       e.dataTransfer.dropEffect = "move";
                       const task = taskById(dragRef.current.id);
                       if (!task) return;
-                      const block = blockById(task.id);
+                      const block = segment(dragRef.current.blockId);
                       const start = gridMinute(e);
                       setHover({
                         date: day,
@@ -942,12 +945,12 @@ export function PlanningCalendar({
                         const task = taskById(block.taskId);
                         if (!task) return null;
                         const end =
-                          resizing?.taskId === task.id
+                          resizing?.blockId === blockKey(block)
                             ? resizing.end
                             : block.end;
                         return (
                           <div
-                            key={task.id}
+                            key={blockKey(block)}
                             className={`calendar-event ${task.priority} ${block.locked ? "locked" : ""}`}
                             style={{
                               top: ((block.start - startHour * 60) / 60) * HOUR,
@@ -972,6 +975,7 @@ export function PlanningCalendar({
                                     HOUR) *
                                     60,
                                 ),
+                                block,
                               )
                             }
                             onDragEnd={() => {
@@ -981,7 +985,9 @@ export function PlanningCalendar({
                           >
                             <button
                               className="event-content"
-                              onClick={() => selectTask(task, day)}
+                              onClick={() =>
+                                selectTask(task, day, undefined, block)
+                              }
                               title={`${task.title} · ${clockTime(block.start)}–${clockTime(end)}`}
                             >
                               <span>
@@ -1010,7 +1016,8 @@ export function PlanningCalendar({
                                     e.stopPropagation();
                                     // Pointer release synthesizes a click after resizing.
                                     // Only keyboard activation should open the editor here.
-                                    if (e.detail === 0) selectTask(task, day);
+                                    if (e.detail === 0)
+                                      selectTask(task, day, undefined, block);
                                   }}
                                 >
                                   <span />
@@ -1061,90 +1068,40 @@ export function PlanningCalendar({
                 <X size={18} />
               </button>
             </header>
-            {chosen ? (
-              <div className="slot-confirm">
-                <strong>{chosen.title}</strong>
-                {chosenBlock && (
-                  <p>
-                    原安排 · {chosenBlock.date} {clockTime(chosenBlock.start)}–
-                    {clockTime(chosenBlock.end)}
-                  </p>
-                )}
-                <p>
-                  {clockTime(slot.start)}–{clockTime(slot.start + duration)} ·{" "}
-                  {duration} 分钟
-                </p>
-                <button
-                  className="button primary"
-                  onClick={async () => {
-                    picker.current?.close();
-                    if (
-                      await perform(
-                        {
-                          type: "schedule",
-                          taskId: chosen.id,
-                          date: slot.date,
-                          start: slot.start,
-                          end: slot.start + duration,
-                        },
-                        slot.revision,
-                      )
-                    )
-                      setChosenId("");
-                  }}
-                >
-                  确认安排
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    picker.current?.close();
-                    selectTask(chosen, slot.date, slot.start);
-                  }}
-                >
-                  调整开始时间或时长
-                </button>
-              </div>
-            ) : (
-              <>
-                {" "}
-                <div className="slot-tasks">
-                  {state.tasks
-                    .filter(
-                      (t) =>
-                        isPending(t) &&
-                        t.id !== state.session?.taskId &&
-                        !blockById(t.id)?.locked &&
-                        !state.tasks.some(
-                          (c) => c.execution?.parentId === t.id,
-                        ),
-                    )
-                    .map((task) => (
-                      <button
-                        className="calendar-queue-task"
-                        key={task.id}
-                        onClick={() => {
-                          picker.current?.close();
-                          selectTask(task, slot.date, slot.start);
-                        }}
-                      >
-                        <strong>{task.title}</strong>
-                        <small>{task.minutes} 分钟</small>
-                      </button>
-                    ))}
-                </div>
-                <button
-                  className="inline-add"
-                  onClick={() => {
-                    picker.current?.close();
-                    onAdd(slot.date);
-                  }}
-                >
-                  <Plus size={15} />
-                  新建当天任务
-                </button>
-              </>
-            )}
+            <div className="slot-tasks">
+              {state.tasks
+                .filter(
+                  (t) =>
+                    isPending(t) &&
+                    t.id !== state.session?.taskId &&
+                    !multiple(t.id) &&
+                    !blockById(t.id)?.locked &&
+                    !state.tasks.some((c) => c.execution?.parentId === t.id),
+                )
+                .map((task) => (
+                  <button
+                    className="calendar-queue-task"
+                    key={task.id}
+                    onClick={() => {
+                      picker.current?.close();
+                      selectTask(task, slot.date, slot.start);
+                    }}
+                  >
+                    <strong>{task.title}</strong>
+                    <small>{task.minutes} 分钟</small>
+                  </button>
+                ))}
+            </div>
+            <button
+              className="inline-add"
+              onClick={() => {
+                picker.current?.close();
+                onAdd(slot.date);
+              }}
+            >
+              <Plus size={15} />
+              新建当天任务
+            </button>
           </>
         )}
       </dialog>
@@ -1177,6 +1134,7 @@ export function PlanningCalendar({
                 {
                   type: "schedule",
                   taskId: draft.taskId,
+                  blockId: draft.blockId,
                   date: draft.date,
                   start: draft.start,
                   end: draft.start + draft.duration,
@@ -1255,14 +1213,19 @@ export function PlanningCalendar({
                 type="button"
                 onClick={() =>
                   perform(
-                    { type: "date", taskId: draft.taskId, date: draft.date },
+                    {
+                      type: "date",
+                      taskId: draft.taskId,
+                      blockId: draft.blockId,
+                      date: draft.date,
+                    },
                     draft.revision,
                   )
                 }
               >
                 只调整日期
               </button>
-              {blockById(draft.taskId) && (
+              {segment(draft.blockId) && (
                 <>
                   <button
                     className="button secondary"
@@ -1272,25 +1235,30 @@ export function PlanningCalendar({
                         {
                           type: "lock",
                           taskId: draft.taskId,
-                          locked: !blockById(draft.taskId)?.locked,
+                          blockId: draft.blockId,
+                          locked: !segment(draft.blockId)?.locked,
                         },
                         draft.revision,
                       )
                     }
                   >
-                    {blockById(draft.taskId)?.locked ? (
+                    {segment(draft.blockId)?.locked ? (
                       <Unlock size={15} />
                     ) : (
                       <LockKeyhole size={15} />
                     )}{" "}
-                    {blockById(draft.taskId)?.locked ? "解锁" : "锁定"}
+                    {segment(draft.blockId)?.locked ? "解锁" : "锁定"}
                   </button>
                   <button
                     className="text-button"
                     type="button"
                     onClick={() =>
                       perform(
-                        { type: "unschedule", taskId: draft.taskId },
+                        {
+                          type: "unschedule",
+                          taskId: draft.taskId,
+                          blockId: draft.blockId,
+                        },
                         draft.revision,
                       )
                     }

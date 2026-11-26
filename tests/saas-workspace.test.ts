@@ -144,6 +144,49 @@ describe("V1.5 migrations and SaaS isolation", () => {
       call("public.flowday_ai_reserve($1,'mock','model')", ["6".repeat(64)]),
     ).rejects.toThrow(/AI_DISABLED/);
   });
+  it("round-trips cross-day segments, rejects overlap, and edits or removes only the selected segment", async () => {
+    const before = await call<AppState>("public.flowday_export()");
+    const taskId = before.tasks.find((task) => task.status === "todo")!.id;
+    const first = {
+      id: "seg-1",
+      taskId,
+      date: day,
+      start: 540,
+      end: 600,
+      locked: false,
+    };
+    const second = {
+      ...first,
+      id: "seg-2",
+      date: "2026-11-20",
+      start: 840,
+      end: 900,
+    };
+    const added = await patch(before.revision, {
+      blocks: { put: [first, second], remove: [] },
+    });
+    const read = () => call<AppState>("public.flowday_export()");
+    expect(validateWorkspace(await read()).blocks).toEqual(
+      expect.arrayContaining([first, second]),
+    );
+    await expect(
+      patch(added.revision, {
+        blocks: { put: [{ ...second, date: day, start: 570 }], remove: [] },
+      }),
+    ).rejects.toThrow(/SCHEDULE_CONFLICT/);
+    const edited = await patch(added.revision, {
+      blocks: { put: [{ ...second, start: 900, end: 960 }], remove: [] },
+    });
+    expect((await read()).blocks).toContainEqual(first);
+    await patch(edited.revision, { blocks: { put: [], remove: [first.id] } });
+    expect((await read()).blocks).not.toContainEqual(first);
+    expect((await read()).blocks).toContainEqual({
+      ...second,
+      start: 900,
+      end: 960,
+    });
+    expect((await read()).tasks.some((task) => task.id === taskId)).toBe(true);
+  });
   it("isolates paged data, enforces server entitlements and clears only the current workspace", async () => {
     await actor(b);
     const today = new Date().toISOString().slice(0, 10);

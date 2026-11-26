@@ -332,14 +332,16 @@ export function Workspace({ account }: { account?: Account }) {
   const orderedTasks = orderTasks(state.tasks);
   const todayTasks = orderedTasks.filter(
     (t) =>
-      t.date === today &&
+      (t.date === today ||
+        (isPending(t) &&
+          state.blocks.some((b) => b.taskId === t.id && b.date === today))) &&
       (t.status === "done" || isPending(t)) &&
       !state.tasks.some((child) => child.execution?.parentId === t.id),
   );
   const doneToday = todayTasks.filter((t) => t.status === "done");
   const pendingToday = todayTasks.filter((t) => t.status === "todo");
   const topTask = pendingToday[0];
-  const plannedMinutes = pendingToday.reduce((n, t) => n + t.minutes, 0);
+  const plannedMinutes = loadForDay(state, today, new Date(now)).requested;
   const progress = todayTasks.length
     ? Math.round((doneToday.length / todayTasks.length) * 100)
     : 0;
@@ -1174,6 +1176,7 @@ export function Workspace({ account }: { account?: Account }) {
             {view === "plan" && (
               <PlanningCalendar
                 state={state}
+                accountMode={!!account}
                 update={update}
                 onAdd={(date) => openNewTask(date)}
                 onEditTask={setEditor}
@@ -1513,7 +1516,10 @@ export function Workspace({ account }: { account?: Account }) {
                       if (existing && existing.date !== task.date) {
                         if (s.session?.taskId === task.id)
                           throw new Error("请先结束专注再修改日期");
-                        if (s.blocks.some((b) => b.taskId === task.id))
+                        if (
+                          s.blocks.filter((b) => b.taskId === task.id)
+                            .length === 1
+                        )
                           s = applyCalendarChange(
                             s,
                             task.date

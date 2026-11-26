@@ -100,6 +100,7 @@ export const stateSchema = z.object({
   ),
   blocks: z.array(
     z.object({
+      id: z.string().min(1).max(128).optional(),
       taskId: z.string(),
       date: z.string(),
       start: z.number().int().min(0).max(1439),
@@ -246,4 +247,8 @@ export function seedState(): AppState {
       },
     ],
   };
+}
+
+export function blockKey(block: AppState["blocks"][number]) {
+  return block.id ?? block.taskId;
 }

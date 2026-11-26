@@ -1,3 +1,4 @@
+import { blockKey } from "../core/model";
 import { z } from "zod";
 import { stateSchema, type AppState } from "../core/model";
 
@@ -60,7 +61,7 @@ export function workspaceDelta(
   return {
     tasks: keyed(before.tasks, after.tasks, (row) => row.id),
     goals: keyed(before.goals, after.goals, (row) => row.id),
-    blocks: keyed(before.blocks, after.blocks, (row) => row.taskId),
+    blocks: keyed(before.blocks, after.blocks, blockKey),
     reviews: keyed(before.reviews, after.reviews, (row) => row.date),
     events: appended(before.events, after.events),
     executionLog: appended(before.executionLog ?? [], after.executionLog ?? []),
@@ -98,7 +99,7 @@ export function mergeWorkspaceDelta(
     ...state,
     tasks: merge(state.tasks, delta.tasks, (row) => row.id),
     goals: merge(state.goals, delta.goals, (row) => row.id),
-    blocks: merge(state.blocks, delta.blocks, (row) => row.taskId),
+    blocks: merge(state.blocks, delta.blocks, blockKey),
     reviews: merge(state.reviews, delta.reviews, (row) => row.date),
     events: [...state.events, ...(delta.events ?? [])],
     executionLog: [

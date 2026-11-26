@@ -223,8 +223,9 @@ export function recordPlanChanges(
   now = Date.now(),
 ) {
   const oldTasks = new Map(before.tasks.map((t) => [t.id, t]));
-  const oldBlocks = new Map(before.blocks.map((b) => [b.taskId, b]));
-  const blocks = new Map(next.blocks.map((b) => [b.taskId, b]));
+  const originalDates = new Set(
+    before.blocks.map((b) => JSON.stringify([b.taskId, b.date])),
+  );
   const commitments = new Set(
     next.executionLog
       ?.filter((e) => e.type === "commit")
@@ -235,14 +236,11 @@ export function recordPlanChanges(
     const old = oldTasks.get(task.id);
     if (old?.date && task.date > old.date)
       record(next, task, "defer", now, { from: old.date, to: task.date });
-    const block = blocks.get(task.id);
-    const prior = oldBlocks.get(task.id);
-    if (block && (!prior || prior.date !== block.date)) {
+    for (const block of next.blocks.filter((b) => b.taskId === task.id)) {
       const key = JSON.stringify([task.id, block.date]);
-      if (!commitments.has(key)) {
-        record(next, task, "commit", now, { to: block.date });
-        commitments.add(key);
-      }
+      if (originalDates.has(key) || commitments.has(key)) continue;
+      record(next, task, "commit", now, { to: block.date });
+      commitments.add(key);
     }
   }
   return next;

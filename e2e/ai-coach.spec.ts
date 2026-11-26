@@ -118,6 +118,10 @@ test("existing goal decomposition attaches to that goal, and profile stays read-
   expect(
     before.tasks.filter((t: { goalId: string }) => t.goalId === "g1"),
   ).toHaveLength(5);
+  await page
+    .getByRole("navigation", { name: "主导航" })
+    .getByRole("button", { name: /^我的一天/ })
+    .click();
   await page.getByRole("button", { name: "查看执行画像", exact: true }).click();
   await page
     .getByRole("button", { name: "生成建议与预览", exact: true })
