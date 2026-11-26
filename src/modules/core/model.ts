@@ -126,6 +126,7 @@ export const stateSchema = z.object({
   ),
   settings: z.object({
     name: z.string().min(1).max(30),
+    bufferPercent: z.number().int().min(0).max(50).multipleOf(5).optional(),
     dayStart: z.number().int().min(0).max(23),
     dayEnd: z.number().int().min(1).max(24),
     capacity: z.number().int().min(30).max(720),

@@ -116,7 +116,7 @@ describe("V1.5 migrations and SaaS isolation", () => {
       revision: before.revision + 1,
     });
     const newer = await patch(before.revision + 1, {
-      settings: { ...before.settings, aiEnabled: false },
+      settings: { ...before.settings, aiEnabled: false, bufferPercent: 35 },
     });
     expect(await patch(before.revision, diff, id)).toEqual({
       savedRevision: before.revision + 1,
@@ -136,6 +136,7 @@ describe("V1.5 migrations and SaaS isolation", () => {
       }),
     ).rejects.toThrow(/CYCLE/);
     const result = await call<AppState>("public.flowday_export()");
+    expect(result.settings.bufferPercent).toBe(35);
     expect(result.tasks[0].title).toBe(target.title);
     expect(result.executionLog).toHaveLength(1);
     expect(result.reviews).toHaveLength(1);

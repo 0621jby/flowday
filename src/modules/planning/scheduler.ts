@@ -15,6 +15,7 @@ export function schedule(
   windows: Slot[],
   capacity: number,
   nowMinute = 0,
+  planningRatio = 0.8,
 ): ScheduleResult {
   const slots = windows
     .filter(
@@ -36,7 +37,7 @@ export function schedule(
   const budget = Math.max(
     0,
     Math.min(
-      Math.floor(capacity * 0.8),
+      Math.floor(capacity * planningRatio),
       merged.reduce((n, s) => n + s.end - s.start, 0),
     ),
   );

@@ -1,4 +1,5 @@
 "use client";
+import { TimeInput } from "./time-controls";
 import { useEffect, useMemo, useState } from "react";
 import {
   cloudData,
@@ -920,7 +921,9 @@ export function GrowthPreferences({
             e.preventDefault();
             const form = new FormData(e.currentTarget);
             const start = toMinute(String(form.get("start")));
-            const end = toMinute(String(form.get("end")));
+            const end = form.get("end")
+              ? toMinute(String(form.get("end")))
+              : 1440;
             const capacity = Number(form.get("capacity"));
             if (end <= start) {
               setMessage("结束时间应晚于开始时间。");
@@ -938,21 +941,20 @@ export function GrowthPreferences({
           <div className="form-grid">
             <label className="field">
               可用开始
-              <input
+              <TimeInput
                 name="start"
-                type="time"
                 required
                 defaultValue={clockTime(day.start)}
               />
             </label>
             <label className="field">
               可用结束
-              <input
+              <TimeInput
                 name="end"
-                type="time"
-                required
-                defaultValue={clockTime(Math.min(day.end, 1439))}
+                defaultValue={day.end === 1440 ? "" : clockTime(day.end)}
+                aria-describedby="availability-end-hint"
               />
+              <small id="availability-end-hint">留空表示 24:00</small>
             </label>
             <label className="field">
               当天可用分钟
@@ -1020,11 +1022,11 @@ export function GrowthPreferences({
             </label>
             <label className="field">
               固定开始
-              <input name="fixedStart" type="time" required />
+              <TimeInput name="fixedStart" required />
             </label>
             <label className="field">
               固定结束
-              <input name="fixedEnd" type="time" required />
+              <TimeInput name="fixedEnd" required />
             </label>
           </div>
           <button className="button secondary" type="submit">

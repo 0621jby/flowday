@@ -1,7 +1,11 @@
 "use client";
+import { TimeInput } from "./time-controls";
 import "./calendar.css";
 import { isPending } from "@/modules/core/execution";
-import { dayAvailability } from "@/modules/planning/availability";
+import {
+  dayAvailability,
+  planningRatio,
+} from "@/modules/planning/availability";
 import {
   useEffect,
   useRef,
@@ -107,6 +111,15 @@ export function PlanningCalendar({
   }, [slot]);
   const [selected, setSelected] = useState(today);
   const [mode, setMode] = useState<"day" | "week" | "month">("week");
+  useEffect(() => {
+    const saved = localStorage.getItem("flowday.calendar-view");
+    if (saved === "day" || saved === "week" || saved === "month")
+      setMode(saved);
+  }, []);
+  function changeMode(next: typeof mode) {
+    setMode(next);
+    localStorage.setItem("flowday.calendar-view", next);
+  }
   const [query, setQuery] = useState("");
   const [queueFilter, setQueueFilter] = useState("all");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -146,10 +159,6 @@ export function PlanningCalendar({
       autoRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [auto]);
   useEffect(() => {
-    if (window.matchMedia("(max-width: 900px), (pointer: coarse)").matches)
-      setMode("day");
-  }, []);
-  useEffect(() => {
     if (draft)
       editorRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -184,6 +193,7 @@ export function PlanningCalendar({
       .map((b) => Math.floor(b.start / 60)),
   );
   const endHour = Math.max(
+    20,
     state.settings.dayEnd,
     ...visibleDays.map((day) =>
       Math.ceil(dayAvailability(state, day).end / 60),
@@ -464,7 +474,7 @@ export function PlanningCalendar({
                 key={v.id}
                 aria-pressed={mode === v.id}
                 className={mode === v.id ? "selected" : ""}
-                onClick={() => setMode(v.id)}
+                onClick={() => changeMode(v.id)}
               >
                 {v.label}
               </button>
@@ -642,24 +652,6 @@ export function PlanningCalendar({
                 }}
               />
             </div>
-            <p>
-              {dayLoad(state, selected) >
-              dayAvailability(state, selected).capacity * 0.8
-                ? "已进入缓冲区，建议给临时变化留点空间。"
-                : "自动安排保留 20% 缓冲，只填空闲，不移动已有时间块。"}
-            </p>
-            <p>
-              尚未预约的当日任务估时：
-              {state.tasks
-                .filter(
-                  (t) =>
-                    t.date === selected &&
-                    isPending(t) &&
-                    !state.blocks.some((b) => b.taskId === t.id),
-                )
-                .reduce((sum, t) => sum + t.minutes, 0)}{" "}
-              分钟（不计入上方已预约时长）。
-            </p>
             <button
               className="button secondary"
               onClick={() => {
@@ -757,7 +749,7 @@ export function PlanningCalendar({
                         </button>
                       )}
                       <div
-                        className={`month-load ${load > dayAvailability(state, selected).capacity * 0.8 ? "heavy" : ""}`}
+                        className={`month-load ${load > dayAvailability(state, day).capacity * planningRatio(state) ? "heavy" : ""}`}
                       >
                         <span
                           style={{
@@ -799,7 +791,8 @@ export function PlanningCalendar({
                     <small
                       className={
                         dayLoad(state, day) >
-                        dayAvailability(state, day).capacity * 0.8
+                        dayAvailability(state, day).capacity *
+                          planningRatio(state)
                           ? "heavy-text"
                           : ""
                       }
@@ -810,8 +803,15 @@ export function PlanningCalendar({
                   </button>
                 ))}
                 <div className="hour-axis" style={{ height: gridHeight }}>
-                  {hours.map((h) => (
-                    <span key={h} style={{ top: (h - startHour) * HOUR }}>
+                  {[...hours, endHour].map((h) => (
+                    <span
+                      key={h}
+                      style={
+                        h === endHour
+                          ? { bottom: 5 }
+                          : { top: (h - startHour) * HOUR }
+                      }
+                    >
                       {clockTime(h * 60)}
                     </span>
                   ))}
@@ -880,9 +880,13 @@ export function PlanningCalendar({
                         />
                       )}
                     {hours.map((h) => {
-                      const start =
-                        day === today ? Math.max(h * 60, nextStart) : h * 60;
-                      const end = (h + 1) * 60;
+                      const window = dayAvailability(state, day);
+                      const start = Math.max(
+                        h * 60,
+                        window.start,
+                        day === today ? nextStart : 0,
+                      );
+                      const end = Math.min((h + 1) * 60, window.end);
                       if (day < today || start >= end) return null;
                       return (
                         <button
@@ -1194,9 +1198,8 @@ export function PlanningCalendar({
               </label>
               <label className="field">
                 开始时间
-                <input
+                <TimeInput
                   required
-                  type="time"
                   step={300}
                   value={clockTime(draft.start)}
                   onChange={(e) => {

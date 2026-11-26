@@ -1,4 +1,5 @@
 "use client";
+import { HourSelect } from "./time-controls";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   cloudData,
@@ -413,23 +414,19 @@ export function FirstRun({
               />
             </label>
             <label className="field">
-              工作开始（整点）
-              <input
-                type="number"
+              默认开始
+              <HourSelect
                 min={0}
                 max={23}
-                required
                 value={start}
                 onChange={(e) => setStart(+e.target.value)}
               />
             </label>
             <label className="field">
-              工作结束（整点）
-              <input
-                type="number"
+              默认结束
+              <HourSelect
                 min={1}
                 max={24}
-                required
                 value={end}
                 onChange={(e) => setEnd(+e.target.value)}
               />

@@ -2,7 +2,11 @@ import { growthDefaults, isPending, record } from "../core/execution";
 import { validateExecutionData } from "../core/execution-validation";
 import { estimateFor, growthReport } from "../core/growth";
 import { localDate, uid, type AppState, type Task } from "../core/model";
-import { availableMinutes, dayAvailability } from "./availability";
+import {
+  availableMinutes,
+  dayAvailability,
+  planningRatio,
+} from "./availability";
 import { addDays, applyCalendarChange, parseDay } from "./calendar";
 import { clockTime } from "./scheduler";
 
@@ -128,7 +132,9 @@ export function adaptivePlan(
     profile.personalize &&
     period.planned >= 5 &&
     period.matched / period.planned < 0.6;
-  const bufferRatio = lowerLoad ? 0.65 : 0.8;
+  const bufferRatio = lowerLoad
+    ? Math.min(0.65, planningRatio(state))
+    : planningRatio(state);
   const overlapsNow = (b: Block) =>
     b.date === today && b.start <= floorMinute(now) && b.end > floorMinute(now);
   const conflicts = state.blocks.flatMap((block) => {

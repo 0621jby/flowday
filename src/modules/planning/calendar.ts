@@ -1,6 +1,6 @@
 import { type AppState, localDate } from "../core/model";
 import { schedule, type Slot } from "./scheduler";
-import { dayAvailability } from "./availability";
+import { dayAvailability, planningRatio } from "./availability";
 import { isPending } from "../core/execution";
 export type CalendarChange =
   | {
@@ -212,7 +212,7 @@ export function fillDay(
   const remaining = Math.max(
     0,
     Math.min(
-      Math.floor(window.capacity * 0.8) - dayLoad(state, date),
+      Math.floor(window.capacity * planningRatio(state)) - dayLoad(state, date),
       maxBudget,
     ),
   );
@@ -237,7 +237,7 @@ export function fillDay(
             now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60,
           )
         : 0;
-  return schedule(tasks, free, remaining / 0.8, minute);
+  return schedule(tasks, free, remaining, minute, 1);
 }
 export function undoCalendar(
   state: AppState,

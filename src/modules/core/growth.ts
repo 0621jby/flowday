@@ -1,5 +1,9 @@
 import { addDays } from "../planning/calendar";
-import { availableMinutes, dayAvailability } from "../planning/availability";
+import {
+  availableMinutes,
+  dayAvailability,
+  planningRatio,
+} from "../planning/availability";
 import { growthDefaults, isPending } from "./execution";
 import {
   localDate,
@@ -264,7 +268,7 @@ export function loadForDay(state: AppState, day: string, now = new Date()) {
     (t) => isPending(t) && t.date === day && !parents.has(t.id),
   );
   const available = availableMinutes(state, day, now);
-  const safeBudget = Math.floor(available * 0.8);
+  const safeBudget = Math.floor(available * planningRatio(state));
   const blocks = new Map(
     state.blocks.filter((b) => b.date === day).map((b) => [b.taskId, b]),
   );

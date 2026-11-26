@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
@@ -67,6 +66,7 @@ import {
 } from "./saas-controls";
 import { STORAGE_KEY } from "@/modules/core/repository";
 import { cloudData, downloadBackup } from "@/modules/cloud/client";
+import { HourSelect } from "./time-controls";
 import { CloudAccount } from "./cloud-account";
 import { type Account } from "@/modules/cloud/client";
 import "./cloud.css";
@@ -408,30 +408,6 @@ export function Workspace({ account }: { account?: Account }) {
     setView(next);
     setGoalFilter(null);
     setQuery("");
-  }
-  async function exportData() {
-    if (account) {
-      try {
-        const data = await cloudData<unknown>(account, { kind: "export" });
-        downloadBackup(
-          JSON.stringify(data, null, 2),
-          `flowday-cloud-${today}.json`,
-        );
-      } catch (e) {
-        setError((e as Error).message);
-      }
-      return;
-    }
-    const blob = new Blob([JSON.stringify(state, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `flowday-${today}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    notify("数据已导出为 JSON");
   }
   const renderTaskRow = (task: Task, compact = false) => (
     <div
@@ -1396,7 +1372,6 @@ export function Workspace({ account }: { account?: Account }) {
                   onSave={(settings) =>
                     commit((s) => ({ ...s, settings }), "偏好已保存")
                   }
-                  onExport={exportData}
                 />
                 <section className="panel integration-panel">
                   <h2>回顾与进步</h2>
@@ -1419,37 +1394,6 @@ export function Workspace({ account }: { account?: Account }) {
                     </button>
                   </div>
                 </section>
-                <section className="panel integration-panel">
-                  <h2>服务连接</h2>
-                  <div>
-                    <span>
-                      <CloudOff size={18} />
-                      云端同步
-                    </span>
-                    <span className="tiny-tag">
-                      {account ? "已连接" : "未配置 · 本地模式"}
-                    </span>
-                  </div>
-                  <div>
-                    <span>
-                      <Sparkles size={18} />
-                      AI 模型服务
-                    </span>
-                    <span className="tiny-tag">状态见 AI 教练面板</span>
-                  </div>
-                  <div>
-                    <span>
-                      <CalendarDays size={18} />
-                      外部日历
-                    </span>
-                    <span className="tiny-tag">后续迭代</span>
-                  </div>
-                  <p>
-                    {account
-                      ? "云端保存不等于历史备份，建议定期导出。此版本不包含收费或订阅。"
-                      : "本地数据不会自动备份到云端。清除浏览器数据会丢失记录，请定期导出。此版本不包含收费或订阅。"}
-                  </p>
-                </section>
               </>
             )}
             {(view === "plan" ||
@@ -1470,9 +1414,7 @@ export function Workspace({ account }: { account?: Account }) {
                 </button>
               </div>
             )}
-            {(
-              ["today", "goals", "plan", "tasks", "insights"] as View[]
-            ).includes(view) && (
+            {(view === "today" || view === "goals") && (
               <div className="ai-entry" aria-label="AI 教练入口">
                 <span className="muted">
                   <Sparkles size={14} /> AI 执行教练
@@ -1486,20 +1428,24 @@ export function Workspace({ account }: { account?: Account }) {
                     })
                   }
                 >
-                  {goalFilter ? "AI 拆解此目标" : "AI 拆解新目标"}
+                  AI 拆解新目标
                 </button>
-                <button
-                  className="button secondary"
-                  onClick={() => setAiRequest({ mode: "plan" })}
-                >
-                  AI 调整今日计划
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() => setAiRequest({ mode: "profile" })}
-                >
-                  查看执行画像
-                </button>
+                {view === "today" && (
+                  <>
+                    <button
+                      className="button secondary"
+                      onClick={() => setAiRequest({ mode: "plan" })}
+                    >
+                      AI 调整今日计划
+                    </button>
+                    <button
+                      className="text-button"
+                      onClick={() => setAiRequest({ mode: "profile" })}
+                    >
+                      查看执行画像
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </main>
@@ -2373,11 +2319,9 @@ function GoalForm({
 function SettingsForm({
   state,
   onSave,
-  onExport,
 }: {
   state: AppState;
   onSave: (settings: AppState["settings"]) => void;
-  onExport: () => void;
 }) {
   const [message, setMessage] = useState("");
   return (
@@ -2405,6 +2349,7 @@ function SettingsForm({
             dayStart,
             dayEnd,
             capacity: Number(data.get("capacity")),
+            bufferPercent: Number(data.get("bufferPercent")),
           });
         }}
       >
@@ -2431,26 +2376,35 @@ function SettingsForm({
             />
           </label>
           <label className="field">
-            开始时间（小时）
-            <input
+            默认开始
+            <HourSelect
               name="dayStart"
-              type="number"
               min={0}
               max={23}
-              required
               defaultValue={state.settings.dayStart}
             />
           </label>
           <label className="field">
-            结束时间（小时）
-            <input
+            默认结束
+            <HourSelect
               name="dayEnd"
-              type="number"
               min={1}
               max={24}
-              required
               defaultValue={state.settings.dayEnd}
             />
+          </label>
+          <label className="field">
+            自动排程缓冲
+            <select
+              name="bufferPercent"
+              defaultValue={state.settings.bufferPercent ?? 20}
+            >
+              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map((percent) => (
+                <option key={percent} value={percent}>
+                  {percent}%
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <p className="muted">
@@ -2463,10 +2417,6 @@ function SettingsForm({
           </p>
         )}
         <div className="form-footer">
-          <button type="button" className="button secondary" onClick={onExport}>
-            <ArrowDownToLine size={16} />
-            导出全部数据
-          </button>
           <button className="button primary" type="submit">
             保存偏好
           </button>

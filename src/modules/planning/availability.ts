@@ -35,3 +35,7 @@ export function availableMinutes(
   }
   return Math.max(0, Math.min(window.capacity, window.end - start - used));
 }
+
+export function planningRatio(state: AppState) {
+  return (100 - (state.settings.bufferPercent ?? 20)) / 100;
+}
