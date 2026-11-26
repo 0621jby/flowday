@@ -1,3 +1,4 @@
+begin;
 -- Persist the scheduling preference in the existing workspace settings payload.
 create or replace function public.flowday_import_v15(p_state jsonb,p_expected bigint,p_mutation uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
@@ -143,3 +144,4 @@ begin
   delete from public.workspace_mutations where user_id=actor and created_at<now()-interval '7 days';
   return jsonb_build_object('savedRevision',current_revision,'revision',current_revision);
 end $$;
+commit;
