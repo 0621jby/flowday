@@ -83,10 +83,25 @@ export function PlanningCalendar({
       (date === today && start !== undefined && start < minuteNow)
     );
   }
+  const [poolOpen, setPoolOpen] = useState(false);
+  const [chosenId, setChosenId] = useState("");
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 900px), (pointer: coarse)");
+    const syncLayout = () => {
+      setCompact(media.matches);
+      if (!media.matches) setChosenId("");
+    };
+    syncLayout();
+    media.addEventListener("change", syncLayout);
+    return () => media.removeEventListener("change", syncLayout);
+  }, []);
   const picker = useRef<HTMLDialogElement>(null);
-  const [slot, setSlot] = useState<{ date: string; start: number } | null>(
-    null,
-  );
+  const [slot, setSlot] = useState<{
+    date: string;
+    start: number;
+    revision: number;
+  } | null>(null);
   useEffect(() => {
     if (slot && !picker.current?.open) picker.current?.showModal();
   }, [slot]);
@@ -184,6 +199,11 @@ export function PlanningCalendar({
   const gridHeight = (endHour - startHour) * HOUR;
   const taskById = (id: string) => state.tasks.find((t) => t.id === id);
   const blockById = (id: string) => state.blocks.find((b) => b.taskId === id);
+  const chosen = state.tasks.find((t) => t.id === chosenId && isPending(t));
+  const chosenBlock = chosen && blockById(chosen.id);
+  const duration = chosenBlock
+    ? chosenBlock.end - chosenBlock.start
+    : (chosen?.minutes ?? 0);
   const queue = state.tasks.filter(
     (t) =>
       isPending(t) &&
@@ -493,7 +513,172 @@ export function PlanningCalendar({
           </button>
         </div>
       )}
-      <div className="calendar-layout">
+      <div className={`calendar-layout ${compact ? "compact-layout" : ""}`}>
+        <aside className="calendar-side">
+          <section className="panel calendar-queue">
+            {compact ? (
+              <button
+                type="button"
+                className="pool-toggle"
+                aria-expanded={poolOpen}
+                aria-controls="pool-options"
+                onClick={() => setPoolOpen(!poolOpen)}
+              >
+                <strong>{chosen ? chosen.title : "选择要安排的任务"}</strong>
+                <span>
+                  {poolOpen
+                    ? "收起"
+                    : chosen
+                      ? "更换任务"
+                      : `任务池 · ${queue.length}`}
+                </span>
+              </button>
+            ) : (
+              <div className="section-heading">
+                <h2>
+                  任务池 <span className="count-badge">{queue.length}</span>
+                </h2>
+                <GripVertical size={17} />
+              </div>
+            )}
+            <div id="pool-options" hidden={compact && !poolOpen}>
+              <label className="calendar-search">
+                <Search size={14} />
+                <input
+                  placeholder="搜索待办…"
+                  aria-label="搜索待办"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              <select
+                className="queue-select"
+                aria-label="任务池筛选"
+                value={queueFilter}
+                onChange={(e) => setQueueFilter(e.target.value)}
+              >
+                <option value="all">全部未完成任务</option>
+                <option value="selected">选中日期的任务</option>
+                <option value="undated">尚未定日期</option>
+                <option value="overdue">过去日期未完成</option>
+              </select>
+              <div className="queue-scroll">
+                {queue.map((task) => (
+                  <button
+                    className="calendar-queue-task"
+                    key={task.id}
+                    draggable={
+                      !blockById(task.id)?.locked &&
+                      state.session?.taskId !== task.id
+                    }
+                    onDragStart={(e) => startDrag(e, task.id)}
+                    onDragEnd={() => {
+                      dragRef.current = null;
+                      setHover(null);
+                    }}
+                    onClick={() => {
+                      if (
+                        !compact ||
+                        blockById(task.id)?.locked ||
+                        task.id === state.session?.taskId ||
+                        state.tasks.some(
+                          (t) => t.execution?.parentId === task.id,
+                        )
+                      ) {
+                        selectTask(task, selected);
+                        return;
+                      }
+                      setChosenId(task.id);
+                      setPoolOpen(false);
+                      setDraft(null);
+                      setMessage("");
+                    }}
+                  >
+                    <GripVertical size={14} />
+                    <div>
+                      <strong>{task.title}</strong>
+                      <small>
+                        {task.minutes} 分钟估时 ·{" "}
+                        {blockById(task.id)
+                          ? "已安排"
+                          : task.date || "未定日期"}
+                      </small>
+                    </div>
+                    {blockById(task.id)?.locked && <LockKeyhole size={12} />}
+                  </button>
+                ))}
+                {!queue.length && (
+                  <p className="calendar-muted">
+                    这个分类里没有待办。换个筛选或新建任务。
+                  </p>
+                )}
+              </div>
+              <button className="inline-add" onClick={() => onAdd(selected)}>
+                <Plus size={15} />
+                添加任务
+              </button>
+            </div>
+            {compact && chosen && !poolOpen && (
+              <div className="pool-next">
+                <span>
+                  {mode === "month" ? "点日期，再选时段" : "点日历中的空白时段"}
+                </span>
+                <button className="text-button" onClick={() => setChosenId("")}>
+                  取消选择
+                </button>
+              </div>
+            )}
+          </section>
+          <section className="panel day-budget">
+            <h2>{selected.slice(5)} · 已预约 / 可用</h2>
+            <strong>
+              {dayLoad(state, selected)}
+              <small> / {dayAvailability(state, selected).capacity} 分钟</small>
+            </strong>
+            <div className="capacity-track">
+              <span
+                style={{
+                  width: `${Math.min(100, (dayLoad(state, selected) / Math.max(1, dayAvailability(state, selected).capacity)) * 100)}%`,
+                }}
+              />
+            </div>
+            <p>
+              {dayLoad(state, selected) >
+              dayAvailability(state, selected).capacity * 0.8
+                ? "已进入缓冲区，建议给临时变化留点空间。"
+                : "自动安排保留 20% 缓冲，只填空闲，不移动已有时间块。"}
+            </p>
+            <p>
+              尚未预约的当日任务估时：
+              {state.tasks
+                .filter(
+                  (t) =>
+                    t.date === selected &&
+                    isPending(t) &&
+                    !state.blocks.some((b) => b.taskId === t.id),
+                )
+                .reduce((sum, t) => sum + t.minutes, 0)}{" "}
+              分钟（不计入上方已预约时长）。
+            </p>
+            <button
+              className="button secondary"
+              onClick={() => {
+                setAuto({
+                  date: selected,
+                  revision: state.revision,
+                  result: fillDay(state, selected),
+                });
+                setMessage("");
+              }}
+            >
+              <Sparkles size={15} />
+              预览当天自动安排
+            </button>
+            <button className="text-button" onClick={onSettings}>
+              调整可用时段与容量
+            </button>
+          </section>
+        </aside>
         <section className="panel calendar-board">
           {mode === "month" ? (
             <>
@@ -526,7 +711,11 @@ export function PlanningCalendar({
                       <button
                         className={`month-date ${day === today ? "is-today" : ""}`}
                         aria-label={`选择 ${day}`}
-                        onClick={() => setSelected(day)}
+                        onClick={() => {
+                          setSelected(day);
+                          if (chosen && mode === "month" && day >= today)
+                            setMode("day");
+                        }}
                       >
                         {Number(day.slice(-2))}
                         <small>{load ? `${load}分` : ""}</small>
@@ -706,7 +895,11 @@ export function PlanningCalendar({
                           aria-label={`${day} ${clockTime(start)} 安排任务`}
                           onClick={() => {
                             setSelected(day);
-                            setSlot({ date: day, start });
+                            setSlot({
+                              date: day,
+                              start,
+                              revision: state.revision,
+                            });
                           }}
                         />
                       );
@@ -842,122 +1035,6 @@ export function PlanningCalendar({
             </div>
           )}
         </section>
-        <aside className="calendar-side">
-          <section className="panel calendar-queue">
-            <div className="section-heading">
-              <h2>
-                任务池 <span className="count-badge">{queue.length}</span>
-              </h2>
-              <GripVertical size={17} />
-            </div>
-            <label className="calendar-search">
-              <Search size={14} />
-              <input
-                placeholder="搜索待办…"
-                aria-label="搜索待办"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
-            <select
-              className="queue-select"
-              aria-label="任务池筛选"
-              value={queueFilter}
-              onChange={(e) => setQueueFilter(e.target.value)}
-            >
-              <option value="all">全部未完成任务</option>
-              <option value="selected">选中日期的任务</option>
-              <option value="undated">尚未定日期</option>
-              <option value="overdue">过去日期未完成</option>
-            </select>
-            <div className="queue-scroll">
-              {queue.map((task) => (
-                <button
-                  className="calendar-queue-task"
-                  key={task.id}
-                  draggable={
-                    !blockById(task.id)?.locked &&
-                    state.session?.taskId !== task.id
-                  }
-                  onDragStart={(e) => startDrag(e, task.id)}
-                  onDragEnd={() => {
-                    dragRef.current = null;
-                    setHover(null);
-                  }}
-                  onClick={() => selectTask(task, selected)}
-                >
-                  <GripVertical size={14} />
-                  <div>
-                    <strong>{task.title}</strong>
-                    <small>
-                      {task.minutes} 分钟估时 ·{" "}
-                      {blockById(task.id) ? "已安排" : task.date || "未定日期"}
-                    </small>
-                  </div>
-                  {blockById(task.id)?.locked && <LockKeyhole size={12} />}
-                </button>
-              ))}
-              {!queue.length && (
-                <p className="calendar-muted">
-                  这个分类里没有待办。换个筛选或新建任务。
-                </p>
-              )}
-            </div>
-            <button className="inline-add" onClick={() => onAdd(selected)}>
-              <Plus size={15} />
-              添加任务
-            </button>
-          </section>
-          <section className="panel day-budget">
-            <h2>{selected.slice(5)} · 已预约 / 可用</h2>
-            <strong>
-              {dayLoad(state, selected)}
-              <small> / {dayAvailability(state, selected).capacity} 分钟</small>
-            </strong>
-            <div className="capacity-track">
-              <span
-                style={{
-                  width: `${Math.min(100, (dayLoad(state, selected) / Math.max(1, dayAvailability(state, selected).capacity)) * 100)}%`,
-                }}
-              />
-            </div>
-            <p>
-              {dayLoad(state, selected) >
-              dayAvailability(state, selected).capacity * 0.8
-                ? "已进入缓冲区，建议给临时变化留点空间。"
-                : "自动安排保留 20% 缓冲，只填空闲，不移动已有时间块。"}
-            </p>
-            <p>
-              尚未预约的当日任务估时：
-              {state.tasks
-                .filter(
-                  (t) =>
-                    t.date === selected &&
-                    isPending(t) &&
-                    !state.blocks.some((b) => b.taskId === t.id),
-                )
-                .reduce((sum, t) => sum + t.minutes, 0)}{" "}
-              分钟（不计入上方已预约时长）。
-            </p>
-            <button
-              className="button secondary"
-              onClick={() => {
-                setAuto({
-                  date: selected,
-                  revision: state.revision,
-                  result: fillDay(state, selected),
-                });
-                setMessage("");
-              }}
-            >
-              <Sparkles size={15} />
-              预览当天自动安排
-            </button>
-            <button className="text-button" onClick={onSettings}>
-              调整可用时段与容量
-            </button>
-          </section>
-        </aside>
       </div>
       <dialog
         className="calendar-picker"
@@ -980,39 +1057,90 @@ export function PlanningCalendar({
                 <X size={18} />
               </button>
             </header>
-            <div className="slot-tasks">
-              {state.tasks
-                .filter(
-                  (t) =>
-                    isPending(t) &&
-                    t.id !== state.session?.taskId &&
-                    !blockById(t.id)?.locked &&
-                    !state.tasks.some((c) => c.execution?.parentId === t.id),
-                )
-                .map((task) => (
-                  <button
-                    className="calendar-queue-task"
-                    key={task.id}
-                    onClick={() => {
-                      picker.current?.close();
-                      selectTask(task, slot.date, slot.start);
-                    }}
-                  >
-                    <strong>{task.title}</strong>
-                    <small>{task.minutes} 分钟</small>
-                  </button>
-                ))}
-            </div>
-            <button
-              className="inline-add"
-              onClick={() => {
-                picker.current?.close();
-                onAdd(slot.date);
-              }}
-            >
-              <Plus size={15} />
-              新建当天任务
-            </button>
+            {chosen ? (
+              <div className="slot-confirm">
+                <strong>{chosen.title}</strong>
+                {chosenBlock && (
+                  <p>
+                    原安排 · {chosenBlock.date} {clockTime(chosenBlock.start)}–
+                    {clockTime(chosenBlock.end)}
+                  </p>
+                )}
+                <p>
+                  {clockTime(slot.start)}–{clockTime(slot.start + duration)} ·{" "}
+                  {duration} 分钟
+                </p>
+                <button
+                  className="button primary"
+                  onClick={async () => {
+                    picker.current?.close();
+                    if (
+                      await perform(
+                        {
+                          type: "schedule",
+                          taskId: chosen.id,
+                          date: slot.date,
+                          start: slot.start,
+                          end: slot.start + duration,
+                        },
+                        slot.revision,
+                      )
+                    )
+                      setChosenId("");
+                  }}
+                >
+                  确认安排
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    picker.current?.close();
+                    selectTask(chosen, slot.date, slot.start);
+                  }}
+                >
+                  调整开始时间或时长
+                </button>
+              </div>
+            ) : (
+              <>
+                {" "}
+                <div className="slot-tasks">
+                  {state.tasks
+                    .filter(
+                      (t) =>
+                        isPending(t) &&
+                        t.id !== state.session?.taskId &&
+                        !blockById(t.id)?.locked &&
+                        !state.tasks.some(
+                          (c) => c.execution?.parentId === t.id,
+                        ),
+                    )
+                    .map((task) => (
+                      <button
+                        className="calendar-queue-task"
+                        key={task.id}
+                        onClick={() => {
+                          picker.current?.close();
+                          selectTask(task, slot.date, slot.start);
+                        }}
+                      >
+                        <strong>{task.title}</strong>
+                        <small>{task.minutes} 分钟</small>
+                      </button>
+                    ))}
+                </div>
+                <button
+                  className="inline-add"
+                  onClick={() => {
+                    picker.current?.close();
+                    onAdd(slot.date);
+                  }}
+                >
+                  <Plus size={15} />
+                  新建当天任务
+                </button>
+              </>
+            )}
           </>
         )}
       </dialog>

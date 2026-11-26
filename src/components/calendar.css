@@ -792,3 +792,67 @@
     z-index: 9;
   }
 }
+
+.calendar-layout:not(.compact-layout) > .calendar-board {
+  grid-area: 1 / 1;
+}
+.calendar-layout:not(.compact-layout) > .calendar-side {
+  grid-area: 1 / 2;
+}
+.calendar-layout.compact-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.compact-layout > .calendar-side {
+  display: contents;
+}
+.compact-layout .calendar-board {
+  order: 1;
+}
+.compact-layout .day-budget {
+  order: 2;
+}
+.compact-layout .calendar-queue {
+  order: 0;
+}
+.compact-layout .queue-scroll {
+  max-height: min(32dvh, 230px);
+}
+.pool-toggle,
+.pool-next {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+}
+.pool-toggle {
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.pool-toggle strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pool-toggle span,
+.pool-next {
+  font-size: 12px;
+  color: #526d58;
+}
+.pool-toggle span {
+  flex-shrink: 0;
+}
+.pool-next {
+  padding-top: 0;
+}
+.slot-confirm {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+.slot-confirm p {
+  font-size: 13px;
+}
